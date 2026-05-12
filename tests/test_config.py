@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
-from jira_cli.config import JiraConfig, load_config, save_config, get_config_path
+from jira_cli.config import JiraConfig, get_config_path, load_config, save_config
 
 
 class TestJiraConfig:

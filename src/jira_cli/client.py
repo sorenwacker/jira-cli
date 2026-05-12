@@ -5,7 +5,7 @@ import base64
 import httpx
 
 from jira_cli.config import JiraConfig
-from jira_cli.models import Issue, Comment, Transition
+from jira_cli.models import Comment, Issue, Transition
 
 
 class JiraClient:
@@ -66,7 +66,17 @@ class JiraClient:
         body = {
             "jql": jql,
             "maxResults": limit,
-            "fields": ["summary", "status", "assignee", "project", "priority", "created", "updated", "description", "attachment"],
+            "fields": [
+                "summary",
+                "status",
+                "assignee",
+                "project",
+                "priority",
+                "created",
+                "updated",
+                "description",
+                "attachment",
+            ],
         }
 
         response = self._client.post("/rest/api/3/search/jql", json=body)
@@ -207,8 +217,7 @@ class JiraClient:
         if transition is None:
             available = [t.name for t in transitions]
             raise ValueError(
-                f"Invalid transition '{transition_name}'. "
-                f"Available: {', '.join(available)}"
+                f"Invalid transition '{transition_name}'. " f"Available: {', '.join(available)}"
             )
 
         # Perform transition
@@ -343,7 +352,17 @@ class JiraClient:
         body = {
             "jql": jql,
             "maxResults": limit,
-            "fields": ["summary", "status", "assignee", "project", "priority", "created", "updated", "description", "attachment"],
+            "fields": [
+                "summary",
+                "status",
+                "assignee",
+                "project",
+                "priority",
+                "created",
+                "updated",
+                "description",
+                "attachment",
+            ],
         }
 
         response = self._client.post("/rest/api/3/search/jql", json=body)
@@ -385,9 +404,7 @@ class JiraClient:
             issue_key: The issue key (e.g., "PROJ-123").
             comment_id: The comment ID.
         """
-        response = self._client.delete(
-            f"/rest/api/3/issue/{issue_key}/comment/{comment_id}"
-        )
+        response = self._client.delete(f"/rest/api/3/issue/{issue_key}/comment/{comment_id}")
         response.raise_for_status()
 
     def close(self) -> None:

@@ -70,10 +70,7 @@ class Issue(BaseModel):
         description = _extract_text_from_adf(fields.get("description"))
 
         # Extract attachments
-        attachments = [
-            Attachment.from_api_response(a)
-            for a in fields.get("attachment", [])
-        ]
+        attachments = [Attachment.from_api_response(a) for a in fields.get("attachment", [])]
 
         return cls(
             key=data["key"],

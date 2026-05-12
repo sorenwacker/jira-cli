@@ -89,8 +89,8 @@ def save_config(config: JiraConfig, config_path: Path | None = None) -> None:
     config_path.parent.mkdir(parents=True, exist_ok=True)
 
     # Write TOML format
-    content = f'''url = "{config.url}"
+    content = f"""url = "{config.url}"
 email = "{config.email}"
 api_token = "{config.api_token}"
-'''
+"""
     config_path.write_text(content)

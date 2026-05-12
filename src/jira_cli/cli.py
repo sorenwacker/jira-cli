@@ -1,11 +1,9 @@
 """CLI commands for Jira CLI."""
 
-from typing import Optional
-
 import typer
 from rich.console import Console
-from rich.table import Table
 from rich.panel import Panel
+from rich.table import Table
 from rich.text import Text
 
 from jira_cli.client import JiraClient
@@ -43,8 +41,8 @@ def get_client() -> JiraClient:
 
 @issue_app.command("list")
 def issue_list(
-    status: Optional[str] = typer.Option(None, "--status", "-s", help="Filter by status"),
-    project: Optional[str] = typer.Option(None, "--project", "-p", help="Filter by project key"),
+    status: str | None = typer.Option(None, "--status", "-s", help="Filter by status"),
+    project: str | None = typer.Option(None, "--project", "-p", help="Filter by project key"),
     limit: int = typer.Option(50, "--limit", "-l", help="Maximum number of results"),
 ) -> None:
     """List issues assigned to you."""
@@ -159,7 +157,7 @@ def comment_delete(
 @issue_app.command("move")
 def issue_move(
     issue_key: str = typer.Argument(..., help="Issue key (e.g., PROJ-123)"),
-    target: Optional[str] = typer.Argument(None, help="Target status to transition to"),
+    target: str | None = typer.Argument(None, help="Target status to transition to"),
 ) -> None:
     """View available transitions or change issue status."""
     with get_client() as client:
@@ -202,13 +200,17 @@ def config(
 def issue_create(
     project: str = typer.Argument(..., help="Project key (e.g., PROJ)"),
     summary: str = typer.Argument(..., help="Issue summary/title"),
-    issue_type: str = typer.Option("Task", "--type", "-t", help="Issue type (Task, Bug, Story, etc.)"),
-    description: Optional[str] = typer.Option(None, "--description", "-d", help="Issue description"),
-    priority: Optional[str] = typer.Option(None, "--priority", "-p", help="Priority (e.g., High, Medium, Low)"),
-    labels: Optional[str] = typer.Option(None, "--labels", "-l", help="Comma-separated labels"),
+    issue_type: str = typer.Option(
+        "Task", "--type", "-t", help="Issue type (Task, Bug, Story, etc.)"
+    ),
+    description: str | None = typer.Option(None, "--description", "-d", help="Issue description"),
+    priority: str | None = typer.Option(
+        None, "--priority", "-p", help="Priority (e.g., High, Medium, Low)"
+    ),
+    labels: str | None = typer.Option(None, "--labels", "-l", help="Comma-separated labels"),
 ) -> None:
     """Create a new issue."""
-    label_list = [l.strip() for l in labels.split(",")] if labels else None
+    label_list = [label.strip() for label in labels.split(",")] if labels else None
 
     with get_client() as client:
         issue_key = client.create_issue(
@@ -226,14 +228,14 @@ def issue_create(
 @issue_app.command("edit")
 def issue_edit(
     issue_key: str = typer.Argument(..., help="Issue key (e.g., PROJ-123)"),
-    summary: Optional[str] = typer.Option(None, "--summary", "-s", help="New summary"),
-    description: Optional[str] = typer.Option(None, "--description", "-d", help="New description"),
-    priority: Optional[str] = typer.Option(None, "--priority", "-p", help="New priority"),
-    labels: Optional[str] = typer.Option(None, "--labels", "-l", help="New labels (comma-separated)"),
-    assignee: Optional[str] = typer.Option(None, "--assignee", "-a", help="New assignee (account ID)"),
+    summary: str | None = typer.Option(None, "--summary", "-s", help="New summary"),
+    description: str | None = typer.Option(None, "--description", "-d", help="New description"),
+    priority: str | None = typer.Option(None, "--priority", "-p", help="New priority"),
+    labels: str | None = typer.Option(None, "--labels", "-l", help="New labels (comma-separated)"),
+    assignee: str | None = typer.Option(None, "--assignee", "-a", help="New assignee (account ID)"),
 ) -> None:
     """Edit issue fields."""
-    label_list = [l.strip() for l in labels.split(",")] if labels else None
+    label_list = [label.strip() for label in labels.split(",")] if labels else None
 
     with get_client() as client:
         client.update_issue(

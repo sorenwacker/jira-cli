@@ -2,13 +2,11 @@
 
 import json
 
-import pytest
 import httpx
+import pytest
 import respx
 
 from jira_cli.client import JiraClient
-from jira_cli.config import JiraConfig
-from jira_cli.models import Issue, Comment, Transition
 
 
 class TestJiraClientSearch:
@@ -143,7 +141,12 @@ class TestJiraClientComments:
                     "author": {"displayName": "Test User"},
                     "body": {
                         "type": "doc",
-                        "content": [{"type": "paragraph", "content": [{"type": "text", "text": "New comment"}]}]
+                        "content": [
+                            {
+                                "type": "paragraph",
+                                "content": [{"type": "text", "text": "New comment"}],
+                            }
+                        ],
                     },
                     "created": "2024-01-15T13:00:00.000+0000",
                 },
@@ -158,7 +161,9 @@ class TestJiraClientComments:
     @respx.mock
     def test_update_comment(self, jira_client: JiraClient) -> None:
         """Can update an existing comment."""
-        route = respx.put("https://test.atlassian.net/rest/api/3/issue/PROJ-123/comment/10001").mock(
+        route = respx.put(
+            "https://test.atlassian.net/rest/api/3/issue/PROJ-123/comment/10001"
+        ).mock(
             return_value=httpx.Response(
                 200,
                 json={
@@ -166,7 +171,12 @@ class TestJiraClientComments:
                     "author": {"displayName": "Test User"},
                     "body": {
                         "type": "doc",
-                        "content": [{"type": "paragraph", "content": [{"type": "text", "text": "Updated comment"}]}]
+                        "content": [
+                            {
+                                "type": "paragraph",
+                                "content": [{"type": "text", "text": "Updated comment"}],
+                            }
+                        ],
                     },
                     "created": "2024-01-15T13:00:00.000+0000",
                 },
@@ -239,7 +249,11 @@ class TestJiraClientCreateIssue:
         respx.post("https://test.atlassian.net/rest/api/3/issue").mock(
             return_value=httpx.Response(
                 201,
-                json={"id": "10001", "key": "PROJ-124", "self": "https://test.atlassian.net/rest/api/3/issue/10001"},
+                json={
+                    "id": "10001",
+                    "key": "PROJ-124",
+                    "self": "https://test.atlassian.net/rest/api/3/issue/10001",
+                },
             )
         )
 
@@ -258,7 +272,11 @@ class TestJiraClientCreateIssue:
         route = respx.post("https://test.atlassian.net/rest/api/3/issue").mock(
             return_value=httpx.Response(
                 201,
-                json={"id": "10001", "key": "PROJ-125", "self": "https://test.atlassian.net/rest/api/3/issue/10001"},
+                json={
+                    "id": "10001",
+                    "key": "PROJ-125",
+                    "self": "https://test.atlassian.net/rest/api/3/issue/10001",
+                },
             )
         )
 
@@ -327,7 +345,7 @@ class TestJiraClientUpdateIssue:
         assert body["fields"]["labels"] == ["bug", "urgent"]
 
 
-class TestJiraClientSearch:
+class TestJiraClientCustomSearch:
     """Tests for custom JQL search."""
 
     @respx.mock
@@ -384,9 +402,9 @@ class TestJiraClientDeleteComment:
     @respx.mock
     def test_delete_comment(self, jira_client: JiraClient) -> None:
         """Can delete a comment."""
-        route = respx.delete("https://test.atlassian.net/rest/api/3/issue/PROJ-123/comment/10001").mock(
-            return_value=httpx.Response(204)
-        )
+        route = respx.delete(
+            "https://test.atlassian.net/rest/api/3/issue/PROJ-123/comment/10001"
+        ).mock(return_value=httpx.Response(204))
 
         jira_client.delete_comment("PROJ-123", "10001")
 

@@ -1,6 +1,7 @@
 """Pytest fixtures for jira-cli tests."""
 
 import pytest
+
 from jira_cli.client import JiraClient
 from jira_cli.config import JiraConfig
 
@@ -62,7 +63,12 @@ def sample_issue_response(sample_attachment_response: list[dict]) -> dict:
             "updated": "2024-01-16T14:20:00.000+0000",
             "description": {
                 "type": "doc",
-                "content": [{"type": "paragraph", "content": [{"type": "text", "text": "Issue description"}]}]
+                "content": [
+                    {
+                        "type": "paragraph",
+                        "content": [{"type": "text", "text": "Issue description"}],
+                    }
+                ],
             },
             "attachment": sample_attachment_response,
         },
@@ -93,7 +99,12 @@ def sample_comments_response() -> dict:
                 "author": {"displayName": "Test User"},
                 "body": {
                     "type": "doc",
-                    "content": [{"type": "paragraph", "content": [{"type": "text", "text": "First comment"}]}]
+                    "content": [
+                        {
+                            "type": "paragraph",
+                            "content": [{"type": "text", "text": "First comment"}],
+                        }
+                    ],
                 },
                 "created": "2024-01-15T11:00:00.000+0000",
             },
@@ -102,7 +113,12 @@ def sample_comments_response() -> dict:
                 "author": {"displayName": "Another User"},
                 "body": {
                     "type": "doc",
-                    "content": [{"type": "paragraph", "content": [{"type": "text", "text": "Second comment"}]}]
+                    "content": [
+                        {
+                            "type": "paragraph",
+                            "content": [{"type": "text", "text": "Second comment"}],
+                        }
+                    ],
                 },
                 "created": "2024-01-15T12:00:00.000+0000",
             },

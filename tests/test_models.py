@@ -1,8 +1,6 @@
 """Tests for Jira data models."""
 
-from datetime import datetime, timezone
-
-from jira_cli.models import Issue, Comment, Transition, Attachment
+from jira_cli.models import Attachment, Comment, Issue, Transition
 
 
 class TestIssue:
@@ -64,9 +62,7 @@ class TestComment:
 
     def test_from_api_response_list(self, sample_comments_response: dict) -> None:
         """Multiple comments can be parsed."""
-        comments = [
-            Comment.from_api_response(c) for c in sample_comments_response["comments"]
-        ]
+        comments = [Comment.from_api_response(c) for c in sample_comments_response["comments"]]
 
         assert len(comments) == 2
         assert comments[0].body == "First comment"
@@ -87,8 +83,7 @@ class TestTransition:
     def test_from_api_response_list(self, sample_transitions_response: dict) -> None:
         """Multiple transitions can be parsed."""
         transitions = [
-            Transition.from_api_response(t)
-            for t in sample_transitions_response["transitions"]
+            Transition.from_api_response(t) for t in sample_transitions_response["transitions"]
         ]
 
         assert len(transitions) == 3
@@ -106,14 +101,15 @@ class TestAttachment:
         assert attachment.filename == "screenshot.png"
         assert attachment.size == 251000
         assert attachment.mime_type == "image/png"
-        assert attachment.content_url == "https://test.atlassian.net/secure/attachment/10001/screenshot.png"
+        assert (
+            attachment.content_url
+            == "https://test.atlassian.net/secure/attachment/10001/screenshot.png"
+        )
         assert attachment.author == "Test User"
 
     def test_from_api_response_list(self, sample_attachment_response: list[dict]) -> None:
         """Multiple attachments can be parsed."""
-        attachments = [
-            Attachment.from_api_response(a) for a in sample_attachment_response
-        ]
+        attachments = [Attachment.from_api_response(a) for a in sample_attachment_response]
 
         assert len(attachments) == 2
         assert attachments[0].filename == "screenshot.png"

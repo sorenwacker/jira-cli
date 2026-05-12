@@ -1,15 +1,14 @@
 """Tests for CLI commands."""
 
-from unittest.mock import patch, MagicMock
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from unittest.mock import MagicMock, patch
 
 import pytest
 from typer.testing import CliRunner
 
 from jira_cli.cli import app
-from jira_cli.models import Issue, Comment, Transition
 from jira_cli.config import JiraConfig
-
+from jira_cli.models import Comment, Issue, Transition
 
 runner = CliRunner()
 
@@ -36,8 +35,8 @@ def mock_issues() -> list[Issue]:
             reporter="Reporter User",
             project="PROJ",
             priority="High",
-            created=datetime(2024, 1, 15, tzinfo=timezone.utc),
-            updated=datetime(2024, 1, 16, tzinfo=timezone.utc),
+            created=datetime(2024, 1, 15, tzinfo=UTC),
+            updated=datetime(2024, 1, 16, tzinfo=UTC),
             description="Description of first issue",
         ),
         Issue(
@@ -48,8 +47,8 @@ def mock_issues() -> list[Issue]:
             reporter="Another Reporter",
             project="PROJ",
             priority="Medium",
-            created=datetime(2024, 1, 14, tzinfo=timezone.utc),
-            updated=datetime(2024, 1, 15, tzinfo=timezone.utc),
+            created=datetime(2024, 1, 14, tzinfo=UTC),
+            updated=datetime(2024, 1, 15, tzinfo=UTC),
             description=None,
         ),
     ]
@@ -63,13 +62,13 @@ def mock_comments() -> list[Comment]:
             id="10001",
             author="Test User",
             body="First comment",
-            created=datetime(2024, 1, 15, 11, 0, tzinfo=timezone.utc),
+            created=datetime(2024, 1, 15, 11, 0, tzinfo=UTC),
         ),
         Comment(
             id="10002",
             author="Another User",
             body="Second comment",
-            created=datetime(2024, 1, 15, 12, 0, tzinfo=timezone.utc),
+            created=datetime(2024, 1, 15, 12, 0, tzinfo=UTC),
         ),
     ]
 
@@ -123,9 +122,7 @@ class TestListCommand:
                 result = runner.invoke(app, ["issue", "list", "--status", "In Progress"])
 
         assert result.exit_code == 0
-        mock_client.get_my_issues.assert_called_with(
-            status="In Progress", project=None, limit=50
-        )
+        mock_client.get_my_issues.assert_called_with(status="In Progress", project=None, limit=50)
 
     def test_list_issues_with_project_filter(
         self, mock_config: JiraConfig, mock_issues: list[Issue]
@@ -140,9 +137,7 @@ class TestListCommand:
                 result = runner.invoke(app, ["issue", "list", "--project", "PROJ"])
 
         assert result.exit_code == 0
-        mock_client.get_my_issues.assert_called_with(
-            status=None, project="PROJ", limit=50
-        )
+        mock_client.get_my_issues.assert_called_with(status=None, project="PROJ", limit=50)
 
     def test_list_no_issues(self, mock_config: JiraConfig) -> None:
         """List command handles no issues gracefully."""
@@ -161,9 +156,7 @@ class TestListCommand:
 class TestViewCommand:
     """Tests for 'jira issue view' command."""
 
-    def test_view_issue(
-        self, mock_config: JiraConfig, mock_issues: list[Issue]
-    ) -> None:
+    def test_view_issue(self, mock_config: JiraConfig, mock_issues: list[Issue]) -> None:
         """View command displays issue details."""
         with patch("jira_cli.cli.load_config", return_value=mock_config):
             with patch("jira_cli.cli.JiraClient") as mock_client_class:
@@ -202,9 +195,7 @@ class TestViewCommand:
 class TestCommentCommand:
     """Tests for 'jira issue comment' commands."""
 
-    def test_add_comment(
-        self, mock_config: JiraConfig, mock_comments: list[Comment]
-    ) -> None:
+    def test_add_comment(self, mock_config: JiraConfig, mock_comments: list[Comment]) -> None:
         """Comment add command adds a comment."""
         with patch("jira_cli.cli.load_config", return_value=mock_config):
             with patch("jira_cli.cli.JiraClient") as mock_client_class:
@@ -220,9 +211,7 @@ class TestCommentCommand:
         mock_client.add_comment.assert_called_with("PROJ-123", "This is my comment")
         assert "Comment added" in result.output
 
-    def test_edit_comment(
-        self, mock_config: JiraConfig
-    ) -> None:
+    def test_edit_comment(self, mock_config: JiraConfig) -> None:
         """Comment edit command updates a comment."""
         with patch("jira_cli.cli.load_config", return_value=mock_config):
             with patch("jira_cli.cli.JiraClient") as mock_client_class:
@@ -237,18 +226,14 @@ class TestCommentCommand:
         mock_client.update_comment.assert_called_with("PROJ-123", "10001", "Updated text")
         assert "Comment updated" in result.output
 
-    def test_delete_comment(
-        self, mock_config: JiraConfig
-    ) -> None:
+    def test_delete_comment(self, mock_config: JiraConfig) -> None:
         """Comment delete command deletes a comment."""
         with patch("jira_cli.cli.load_config", return_value=mock_config):
             with patch("jira_cli.cli.JiraClient") as mock_client_class:
                 mock_client = create_mock_client()
                 mock_client_class.return_value = mock_client
 
-                result = runner.invoke(
-                    app, ["issue", "comment", "delete", "PROJ-123", "10001"]
-                )
+                result = runner.invoke(app, ["issue", "comment", "delete", "PROJ-123", "10001"])
 
         assert result.exit_code == 0
         mock_client.delete_comment.assert_called_with("PROJ-123", "10001")

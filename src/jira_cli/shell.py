@@ -9,12 +9,11 @@ except ImportError:
     readline = None  # type: ignore
 
 from rich.console import Console
-from rich.table import Table
 from rich.panel import Panel
+from rich.table import Table
 from rich.text import Text
 
 from jira_cli.client import JiraClient
-
 
 console = Console()
 
@@ -237,7 +236,7 @@ class JiraShell(cmd.Cmd):
             self.client.get_issue(arg.upper())
             self.current_issue = arg.upper()
             self._update_prompt()
-        except Exception as e:
+        except Exception:
             console.print(f"[red]Issue not found: {arg}[/red]")
 
     def do_pwd(self, arg: str) -> None:
@@ -256,31 +255,33 @@ class JiraShell(cmd.Cmd):
             return
 
         content = Text()
-        content.append(f"Summary: ", style="bold")
+        content.append("Summary: ", style="bold")
         content.append(f"{issue.summary}\n")
-        content.append(f"Status: ", style="bold")
+        content.append("Status: ", style="bold")
         content.append(f"{issue.status}\n")
-        content.append(f"Priority: ", style="bold")
+        content.append("Priority: ", style="bold")
         content.append(f"{issue.priority or '-'}\n")
-        content.append(f"Assignee: ", style="bold")
+        content.append("Assignee: ", style="bold")
         content.append(f"{issue.assignee or 'Unassigned'}\n")
-        content.append(f"Reporter: ", style="bold")
+        content.append("Reporter: ", style="bold")
         content.append(f"{issue.reporter or 'Unknown'}\n")
-        content.append(f"Project: ", style="bold")
+        content.append("Project: ", style="bold")
         content.append(f"{issue.project}\n")
-        content.append(f"Created: ", style="bold")
+        content.append("Created: ", style="bold")
         content.append(f"{issue.created.strftime('%Y-%m-%d %H:%M')}\n")
-        content.append(f"Updated: ", style="bold")
+        content.append("Updated: ", style="bold")
         content.append(f"{issue.updated.strftime('%Y-%m-%d %H:%M')}\n")
 
         if issue.description:
-            content.append(f"\nDescription:\n", style="bold")
+            content.append("\nDescription:\n", style="bold")
             content.append(issue.description)
 
         if issue.attachments:
-            content.append(f"\n\nAttachments:\n", style="bold")
+            content.append("\n\nAttachments:\n", style="bold")
             for att in issue.attachments:
-                content.append(f"  - {att.filename} ({_format_size(att.size)})\n    {att.content_url}\n")
+                content.append(
+                    f"  - {att.filename} ({_format_size(att.size)})\n    {att.content_url}\n"
+                )
 
         console.print(Panel(content, title=f"[cyan]{issue.key}[/cyan]"))
 
@@ -330,11 +331,13 @@ class JiraShell(cmd.Cmd):
         # Handle quoted text
         text = arg.strip()
         if not text:
-            console.print("[yellow]Usage: comment \"your comment text\"[/yellow]")
+            console.print('[yellow]Usage: comment "your comment text"[/yellow]')
             return
 
         # Remove surrounding quotes if present
-        if (text.startswith('"') and text.endswith('"')) or (text.startswith("'") and text.endswith("'")):
+        if (text.startswith('"') and text.endswith('"')) or (
+            text.startswith("'") and text.endswith("'")
+        ):
             text = text[1:-1]
 
         try:
@@ -365,7 +368,9 @@ class JiraShell(cmd.Cmd):
         else:
             # Perform transition
             # Remove quotes if present
-            if (target.startswith('"') and target.endswith('"')) or (target.startswith("'") and target.endswith("'")):
+            if (target.startswith('"') and target.endswith('"')) or (
+                target.startswith("'") and target.endswith("'")
+            ):
                 target = target[1:-1]
 
             try:
@@ -381,11 +386,11 @@ class JiraShell(cmd.Cmd):
         try:
             args = shlex.split(arg)
         except ValueError:
-            console.print("[yellow]Usage: new PROJECT \"Summary\" [--type TYPE][/yellow]")
+            console.print('[yellow]Usage: new PROJECT "Summary" [--type TYPE][/yellow]')
             return
 
         if len(args) < 2:
-            console.print("[yellow]Usage: new PROJECT \"Summary\" [--type TYPE][/yellow]")
+            console.print('[yellow]Usage: new PROJECT "Summary" [--type TYPE][/yellow]')
             return
 
         project = args[0]
@@ -441,7 +446,7 @@ class JiraShell(cmd.Cmd):
                 priority = args[i + 1]
                 i += 2
             elif args[i] in ("--labels", "-l") and i + 1 < len(args):
-                labels = [l.strip() for l in args[i + 1].split(",")]
+                labels = [label.strip() for label in args[i + 1].split(",")]
                 i += 2
             elif args[i] in ("--description", "-d") and i + 1 < len(args):
                 description = args[i + 1]
@@ -450,7 +455,9 @@ class JiraShell(cmd.Cmd):
                 i += 1
 
         if not any([summary, priority, labels, description]):
-            console.print("[yellow]Usage: edit --summary \"new\" --priority High --labels \"a,b\"[/yellow]")
+            console.print(
+                '[yellow]Usage: edit --summary "new" --priority High --labels "a,b"[/yellow]'
+            )
             return
 
         try:
@@ -469,11 +476,13 @@ class JiraShell(cmd.Cmd):
         """Search with JQL. Usage: search "project = PROJ AND status = Open" """
         jql = arg.strip()
         if not jql:
-            console.print("[yellow]Usage: search \"JQL query\"[/yellow]")
+            console.print('[yellow]Usage: search "JQL query"[/yellow]')
             return
 
         # Remove surrounding quotes if present
-        if (jql.startswith('"') and jql.endswith('"')) or (jql.startswith("'") and jql.endswith("'")):
+        if (jql.startswith('"') and jql.endswith('"')) or (
+            jql.startswith("'") and jql.endswith("'")
+        ):
             jql = jql[1:-1]
 
         try:
