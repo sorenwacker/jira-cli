@@ -141,6 +141,30 @@ jira issue watch PROJ-123
 jira issue unwatch PROJ-123
 ```
 
+## MCP Server (Claude Desktop)
+
+The CLI includes an MCP server for integration with Claude Desktop.
+
+Start the server:
+
+```bash
+jira-mcp
+```
+
+Configure Claude Desktop (`~/Library/Application Support/Claude/claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "jira": {
+      "command": "jira-mcp"
+    }
+  }
+}
+```
+
+Available tools: `get_issue`, `search_issues`, `get_my_issues`, `create_issue`, `update_issue`, `get_transitions`, `transition_issue`, `get_comments`, `add_comment`, `get_projects`, `get_users`, `watch_issue`, `unwatch_issue`, `delete_issue`
+
 ## Development
 
 ```bash
