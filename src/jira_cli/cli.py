@@ -28,7 +28,21 @@ comment_app = typer.Typer(
     no_args_is_help=True,
 )
 
+user_app = typer.Typer(
+    name="user",
+    help="User management commands.",
+    no_args_is_help=True,
+)
+
+project_app = typer.Typer(
+    name="project",
+    help="Project management commands.",
+    no_args_is_help=True,
+)
+
 app.add_typer(issue_app, name="issue")
+app.add_typer(user_app, name="user")
+app.add_typer(project_app, name="project")
 issue_app.add_typer(comment_app, name="comment")
 
 console = Console()
@@ -225,6 +239,35 @@ def issue_create(
     console.print(f"[green]Created {issue_key}[/green]")
 
 
+@issue_app.command("create-subtask")
+def issue_create_subtask(
+    parent_key: str = typer.Argument(..., help="Parent issue key (e.g., PROJ-123)"),
+    summary: str = typer.Argument(..., help="Subtask summary"),
+    issue_type: str = typer.Option(
+        "Sub-task", "--type", "-t", help="Issue type (defaults to Sub-task)"
+    ),
+    description: str | None = typer.Option(None, "--description", "-d", help="Subtask description"),
+    priority: str | None = typer.Option(
+        None, "--priority", "-p", help="Priority (e.g., High, Medium, Low)"
+    ),
+) -> None:
+    """Create a subtask under a parent issue."""
+    # Extract project key from parent issue key
+    project = parent_key.split("-")[0]
+
+    with get_client() as client:
+        issue_key = client.create_issue(
+            project=project,
+            summary=summary,
+            issue_type=issue_type,
+            description=description,
+            priority=priority,
+            parent=parent_key,
+        )
+
+    console.print(f"[green]Created subtask {issue_key} under {parent_key}[/green]")
+
+
 @issue_app.command("edit")
 def issue_edit(
     issue_key: str = typer.Argument(..., help="Issue key (e.g., PROJ-123)"),
@@ -308,6 +351,62 @@ def shell() -> None:
     with get_client() as client:
         jira_shell = JiraShell(client)
         jira_shell.cmdloop()
+
+
+@user_app.command("list")
+def user_list(
+    project: str = typer.Option(
+        ..., "--project", "-p", help="Project key to list assignable users"
+    ),
+    query: str | None = typer.Option(None, "--query", "-q", help="Search by name or email"),
+    limit: int = typer.Option(1000, "--limit", "-l", help="Maximum number of results"),
+) -> None:
+    """List users assignable to a project."""
+    with get_client() as client:
+        users = client.get_users(query=query, project=project, limit=limit)
+
+    if not users:
+        console.print("[yellow]No users found[/yellow]")
+        return
+
+    table = Table(title=f"Users assignable to {project}")
+    table.add_column("Display Name", style="cyan")
+    table.add_column("Email")
+    table.add_column("Account ID", style="dim")
+
+    for user in users:
+        table.add_row(
+            user.display_name,
+            user.email or "-",
+            user.account_id,
+        )
+
+    console.print(table)
+
+
+@project_app.command("list")
+def project_list() -> None:
+    """List all projects."""
+    with get_client() as client:
+        projects = client.get_projects()
+
+    if not projects:
+        console.print("[yellow]No projects found[/yellow]")
+        return
+
+    table = Table(title="Projects")
+    table.add_column("Key", style="cyan")
+    table.add_column("Name")
+    table.add_column("Type", style="dim")
+
+    for project in projects:
+        table.add_row(
+            project.key,
+            project.name,
+            project.project_type,
+        )
+
+    console.print(table)
 
 
 if __name__ == "__main__":

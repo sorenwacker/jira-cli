@@ -292,6 +292,59 @@ class TestJiraClientCreateIssue:
         assert body["fields"]["summary"] == "Minimal issue"
         assert body["fields"]["issuetype"]["name"] == "Task"
 
+    @respx.mock
+    def test_create_subtask(self, jira_client: JiraClient) -> None:
+        """Can create a subtask under a parent issue."""
+        route = respx.post("https://test.atlassian.net/rest/api/3/issue").mock(
+            return_value=httpx.Response(
+                201,
+                json={
+                    "id": "10002",
+                    "key": "PROJ-126",
+                    "self": "https://test.atlassian.net/rest/api/3/issue/10002",
+                },
+            )
+        )
+
+        issue_key = jira_client.create_issue(
+            project="PROJ",
+            summary="Subtask summary",
+            issue_type="Sub-task",
+            parent="PROJ-123",
+        )
+
+        assert issue_key == "PROJ-126"
+        body = json.loads(route.calls[0].request.content)
+        assert body["fields"]["parent"]["key"] == "PROJ-123"
+        assert body["fields"]["issuetype"]["name"] == "Sub-task"
+
+    @respx.mock
+    def test_create_subtask_with_description(self, jira_client: JiraClient) -> None:
+        """Can create a subtask with description."""
+        route = respx.post("https://test.atlassian.net/rest/api/3/issue").mock(
+            return_value=httpx.Response(
+                201,
+                json={
+                    "id": "10003",
+                    "key": "PROJ-127",
+                    "self": "https://test.atlassian.net/rest/api/3/issue/10003",
+                },
+            )
+        )
+
+        issue_key = jira_client.create_issue(
+            project="PROJ",
+            summary="Subtask with details",
+            issue_type="Sub-task",
+            description="Subtask description",
+            parent="PROJ-123",
+        )
+
+        assert issue_key == "PROJ-127"
+        body = json.loads(route.calls[0].request.content)
+        assert body["fields"]["parent"]["key"] == "PROJ-123"
+        assert "description" in body["fields"]
+
 
 class TestJiraClientUpdateIssue:
     """Tests for issue updates."""
@@ -440,3 +493,113 @@ class TestJiraClientAuth:
 
         with pytest.raises(httpx.HTTPStatusError):
             jira_client.get_my_issues()
+
+
+class TestJiraClientProjects:
+    """Tests for project listing functionality."""
+
+    @respx.mock
+    def test_get_projects(
+        self,
+        jira_client: JiraClient,
+        sample_projects_response: list[dict],
+    ) -> None:
+        """Can retrieve projects."""
+        respx.get("https://test.atlassian.net/rest/api/3/project").mock(
+            return_value=httpx.Response(200, json=sample_projects_response)
+        )
+
+        projects = jira_client.get_projects()
+
+        assert len(projects) == 2
+        assert projects[0].key == "DAT"
+        assert projects[0].name == "Data Project"
+        assert projects[0].project_type == "software"
+
+
+class TestJiraClientUsers:
+    """Tests for user search functionality."""
+
+    @respx.mock
+    def test_get_users_filters_apps_and_no_email_by_default(
+        self,
+        jira_client: JiraClient,
+        sample_users_response: list[dict],
+    ) -> None:
+        """Filters out app accounts and users without emails by default."""
+        respx.get("https://test.atlassian.net/rest/api/3/users/search").mock(
+            return_value=httpx.Response(200, json=sample_users_response)
+        )
+
+        users = jira_client.get_users()
+
+        assert len(users) == 2
+        assert all(u.account_type == "atlassian" for u in users)
+        assert all(u.email is not None for u in users)
+        assert users[0].account_id == "abc123"
+        assert users[0].display_name == "John Doe"
+
+    @respx.mock
+    def test_get_users_include_apps(
+        self,
+        jira_client: JiraClient,
+        sample_users_response: list[dict],
+    ) -> None:
+        """Can include app accounts and users without emails when requested."""
+        respx.get("https://test.atlassian.net/rest/api/3/users/search").mock(
+            return_value=httpx.Response(200, json=sample_users_response)
+        )
+
+        users = jira_client.get_users(include_apps=True)
+
+        assert len(users) == 4
+        assert any(u.account_type == "app" for u in users)
+        assert any(u.email is None for u in users)
+
+    @respx.mock
+    def test_get_users_with_query(
+        self,
+        jira_client: JiraClient,
+        sample_users_response: list[dict],
+    ) -> None:
+        """Can search users with query string."""
+        route = respx.get("https://test.atlassian.net/rest/api/3/users/search").mock(
+            return_value=httpx.Response(200, json=sample_users_response)
+        )
+
+        jira_client.get_users(query="john")
+
+        assert "query=john" in str(route.calls[0].request.url)
+
+    @respx.mock
+    def test_get_users_with_limit(
+        self,
+        jira_client: JiraClient,
+        sample_users_response: list[dict],
+    ) -> None:
+        """Can limit number of user results."""
+        route = respx.get("https://test.atlassian.net/rest/api/3/users/search").mock(
+            return_value=httpx.Response(200, json=sample_users_response)
+        )
+
+        jira_client.get_users(limit=10)
+
+        assert "maxResults=10" in str(route.calls[0].request.url)
+
+    @respx.mock
+    def test_get_users_assignable_for_project(
+        self,
+        jira_client: JiraClient,
+        sample_users_response: list[dict],
+    ) -> None:
+        """Can get assignable users for a project."""
+        route = respx.get("https://test.atlassian.net/rest/api/3/user/assignable/search").mock(
+            return_value=httpx.Response(200, json=sample_users_response)
+        )
+
+        users = jira_client.get_users(project="PROJ")
+
+        assert route.called
+        assert "project=PROJ" in str(route.calls[0].request.url)
+        # Project search returns all users without filtering
+        assert len(users) == 4

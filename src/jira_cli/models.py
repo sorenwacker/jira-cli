@@ -123,6 +123,50 @@ class Transition(BaseModel):
         )
 
 
+class Project(BaseModel):
+    """Represents a Jira project."""
+
+    key: str
+    name: str
+    project_type: str
+
+    @classmethod
+    def from_api_response(cls, data: dict[str, Any]) -> "Project":
+        """Create a Project from Jira API response."""
+        return cls(
+            key=data["key"],
+            name=data["name"],
+            project_type=data.get("projectTypeKey", ""),
+        )
+
+
+class User(BaseModel):
+    """Represents a Jira user."""
+
+    account_id: str
+    display_name: str
+    email: str | None
+    active: bool
+    account_type: str
+    avatar_url: str | None
+
+    @classmethod
+    def from_api_response(cls, data: dict[str, Any]) -> "User":
+        """Create a User from Jira API response."""
+        avatar_url = None
+        if data.get("avatarUrls"):
+            avatar_url = data["avatarUrls"].get("48x48")
+
+        return cls(
+            account_id=data["accountId"],
+            display_name=data.get("displayName", ""),
+            email=data.get("emailAddress"),
+            active=data.get("active", True),
+            account_type=data.get("accountType", "atlassian"),
+            avatar_url=avatar_url,
+        )
+
+
 def _extract_text_from_adf(adf: dict[str, Any] | None) -> str | None:
     """Extract plain text from Atlassian Document Format (ADF)."""
     if adf is None:

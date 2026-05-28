@@ -240,6 +240,96 @@ class TestCommentCommand:
         assert "Comment deleted" in result.output
 
 
+class TestCreateSubtaskCommand:
+    """Tests for 'jira issue create-subtask' command."""
+
+    def test_create_subtask(self, mock_config: JiraConfig) -> None:
+        """Can create a subtask under a parent issue."""
+        with patch("jira_cli.cli.load_config", return_value=mock_config):
+            with patch("jira_cli.cli.JiraClient") as mock_client_class:
+                mock_client = create_mock_client()
+                mock_client.create_issue.return_value = "PROJ-124"
+                mock_client_class.return_value = mock_client
+
+                result = runner.invoke(
+                    app, ["issue", "create-subtask", "PROJ-123", "Subtask summary"]
+                )
+
+        assert result.exit_code == 0
+        mock_client.create_issue.assert_called_once_with(
+            project="PROJ",
+            summary="Subtask summary",
+            issue_type="Sub-task",
+            description=None,
+            priority=None,
+            parent="PROJ-123",
+        )
+        assert "Created subtask PROJ-124" in result.output
+        assert "under PROJ-123" in result.output
+
+    def test_create_subtask_with_options(self, mock_config: JiraConfig) -> None:
+        """Can create a subtask with description and priority."""
+        with patch("jira_cli.cli.load_config", return_value=mock_config):
+            with patch("jira_cli.cli.JiraClient") as mock_client_class:
+                mock_client = create_mock_client()
+                mock_client.create_issue.return_value = "PROJ-125"
+                mock_client_class.return_value = mock_client
+
+                result = runner.invoke(
+                    app,
+                    [
+                        "issue",
+                        "create-subtask",
+                        "PROJ-123",
+                        "Subtask with details",
+                        "--description",
+                        "Detailed description",
+                        "--priority",
+                        "High",
+                    ],
+                )
+
+        assert result.exit_code == 0
+        mock_client.create_issue.assert_called_once_with(
+            project="PROJ",
+            summary="Subtask with details",
+            issue_type="Sub-task",
+            description="Detailed description",
+            priority="High",
+            parent="PROJ-123",
+        )
+
+    def test_create_subtask_custom_type(self, mock_config: JiraConfig) -> None:
+        """Can create subtask with custom issue type."""
+        with patch("jira_cli.cli.load_config", return_value=mock_config):
+            with patch("jira_cli.cli.JiraClient") as mock_client_class:
+                mock_client = create_mock_client()
+                mock_client.create_issue.return_value = "PROJ-126"
+                mock_client_class.return_value = mock_client
+
+                result = runner.invoke(
+                    app,
+                    [
+                        "issue",
+                        "create-subtask",
+                        "PROJ-123",
+                        "Technical subtask",
+                        "--type",
+                        "Technical Task",
+                    ],
+                )
+
+        assert result.exit_code == 0
+        mock_client.create_issue.assert_called_once_with(
+            project="PROJ",
+            summary="Technical subtask",
+            issue_type="Technical Task",
+            description=None,
+            priority=None,
+            parent="PROJ-123",
+        )
+
+
 class TestMoveCommand:
     """Tests for 'jira issue move' command."""
 

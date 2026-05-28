@@ -11,10 +11,12 @@ jira-cli/
 ├── src/
 │   └── jira_cli/
 │       ├── __init__.py
+│       ├── adf.py          # Markdown to ADF conversion
 │       ├── cli.py          # Typer CLI commands
 │       ├── client.py       # Jira API client
 │       ├── models.py       # Data models (Pydantic)
 │       ├── config.py       # Configuration management
+│       ├── mcp.py          # MCP server for Claude Desktop
 │       └── shell.py        # Interactive shell
 ├── tests/
 │   ├── __init__.py
@@ -97,6 +99,12 @@ jira status PROJ-123
 
 # Transition to new status
 jira status PROJ-123 "In Progress"
+
+# List assignable users for a project
+jira user list --project PROJ
+
+# Search users by name
+jira user list --project PROJ --query "john"
 ```
 
 ## Data Models
@@ -134,6 +142,41 @@ class Transition:
     name: str
 ```
 
+## Markdown to ADF Conversion
+
+The CLI converts markdown text to Atlassian Document Format (ADF) for descriptions and comments. This preserves formatting when viewing in Jira's web UI.
+
+### Supported Markdown Syntax
+
+| Syntax | Description |
+|--------|-------------|
+| `**bold**` | Bold text |
+| `*italic*` | Italic text |
+| `` `code` `` | Inline code |
+| ```` ```lang ```` | Code blocks with language |
+| `# Heading` | Headings (levels 1-6) |
+| `- item` | Bullet lists |
+| `1. item` | Numbered lists |
+| `[text](url)` | Links |
+| `---` | Horizontal rule |
+| Blank line | Paragraph break |
+
+### Example
+
+```bash
+jira issue create PROJ "New feature" -d "## Overview
+
+This is a **new feature** with:
+- Item one
+- Item two
+
+\`\`\`python
+def hello():
+    print('world')
+\`\`\`
+"
+```
+
 ## Dependencies
 
 - `typer` - CLI framework
@@ -151,12 +194,92 @@ class Transition:
 | Add comment | POST | `/rest/api/3/issue/{key}/comment` |
 | Get transitions | GET | `/rest/api/3/issue/{key}/transitions` |
 | Do transition | POST | `/rest/api/3/issue/{key}/transitions` |
+| Search users | GET | `/rest/api/3/users/search` |
+
+## Data Models
+
+### User
+
+```python
+class User:
+    account_id: str        # Jira account ID
+    display_name: str      # Display name
+    email: str | None      # Email (may be None for privacy)
+    active: bool           # Whether user is active
+    avatar_url: str | None # Avatar image URL
+```
+
+## Subtask Creation
+
+Subtasks are child issues linked to a parent issue. Created using the `parent` parameter in `create_issue()` or the dedicated CLI command.
+
+### CLI Command
+
+```bash
+# Create subtask under parent issue
+jira issue create-subtask PROJ-123 "Subtask summary"
+
+# With options
+jira issue create-subtask PROJ-123 "Summary" --type "Sub-task" --description "Details"
+```
+
+### API
+
+```python
+# Create subtask programmatically
+client.create_issue(
+    project="PROJ",
+    summary="Subtask summary",
+    issue_type="Sub-task",
+    parent="PROJ-123",
+)
+```
+
+## MCP Server
+
+The MCP (Model Context Protocol) server exposes Jira operations as tools for AI assistants like Claude Desktop.
+
+### Running the Server
+
+```bash
+# Start MCP server (stdio transport)
+jira-mcp
+```
+
+### Claude Desktop Configuration
+
+Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "jira": {
+      "command": "jira-mcp"
+    }
+  }
+}
+```
+
+### Available Tools
+
+| Tool | Description |
+|------|-------------|
+| `get_issue` | Get issue details by key |
+| `search_issues` | Search issues with JQL |
+| `get_my_issues` | Get issues assigned to current user |
+| `create_issue` | Create an issue or subtask |
+| `update_issue` | Update issue fields |
+| `get_transitions` | List available status transitions |
+| `transition_issue` | Change issue status |
+| `get_comments` | Get issue comments |
+| `add_comment` | Add a comment |
+| `get_projects` | List all projects |
+| `get_users` | Search users |
+| `watch_issue` | Start watching an issue |
+| `unwatch_issue` | Stop watching an issue |
 
 ## Future (v2+)
 
 - NiceGUI web interface
-- Create new issues
-- Update issue fields (priority, labels, assignee)
-- Watch/unwatch issues
 - Bulk operations
 - Caching for offline viewing

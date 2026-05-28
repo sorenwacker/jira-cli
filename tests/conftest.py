@@ -136,3 +136,65 @@ def sample_transitions_response() -> dict:
             {"id": "31", "name": "Done"},
         ]
     }
+
+
+@pytest.fixture
+def sample_projects_response() -> list[dict]:
+    """Sample Jira API response for projects."""
+    return [
+        {
+            "key": "DAT",
+            "name": "Data Project",
+            "projectTypeKey": "software",
+        },
+        {
+            "key": "DEV",
+            "name": "Development",
+            "projectTypeKey": "software",
+        },
+    ]
+
+
+@pytest.fixture
+def sample_users_response() -> list[dict]:
+    """Sample Jira API response for user search."""
+    return [
+        {
+            "accountId": "abc123",
+            "displayName": "John Doe",
+            "emailAddress": "john@example.com",
+            "active": True,
+            "accountType": "atlassian",
+            "avatarUrls": {
+                "48x48": "https://avatar.example.com/john.png",
+            },
+        },
+        {
+            "accountId": "def456",
+            "displayName": "Jane Smith",
+            "emailAddress": "jane@example.com",
+            "active": True,
+            "accountType": "atlassian",
+            "avatarUrls": {
+                "48x48": "https://avatar.example.com/jane.png",
+            },
+        },
+        {
+            "accountId": "ghi789",
+            "displayName": "No Email User",
+            "active": True,
+            "accountType": "atlassian",
+            "avatarUrls": {
+                "48x48": "https://avatar.example.com/noemail.png",
+            },
+        },
+        {
+            "accountId": "app789",
+            "displayName": "Automation Bot",
+            "active": True,
+            "accountType": "app",
+            "avatarUrls": {
+                "48x48": "https://avatar.example.com/bot.png",
+            },
+        },
+    ]

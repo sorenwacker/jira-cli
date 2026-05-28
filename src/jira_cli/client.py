@@ -4,8 +4,9 @@ import base64
 
 import httpx
 
+from jira_cli.adf import markdown_to_adf
 from jira_cli.config import JiraConfig
-from jira_cli.models import Comment, Issue, Transition
+from jira_cli.models import Comment, Issue, Project, Transition, User
 
 
 class JiraClient:
@@ -122,28 +123,14 @@ class JiraClient:
 
         Args:
             issue_key: The issue key (e.g., "PROJ-123").
-            body: The comment text.
+            body: The comment text (supports markdown formatting).
 
         Returns:
             The created Comment object.
         """
-        # Jira Cloud uses Atlassian Document Format (ADF)
-        adf_body = {
-            "body": {
-                "type": "doc",
-                "version": 1,
-                "content": [
-                    {
-                        "type": "paragraph",
-                        "content": [{"type": "text", "text": body}],
-                    }
-                ],
-            }
-        }
-
         response = self._client.post(
             f"/rest/api/3/issue/{issue_key}/comment",
-            json=adf_body,
+            json={"body": markdown_to_adf(body)},
         )
         response.raise_for_status()
 
@@ -155,24 +142,11 @@ class JiraClient:
         Args:
             issue_key: The issue key (e.g., "PROJ-123").
             comment_id: The comment ID.
-            body: The new comment text.
+            body: The new comment text (supports markdown formatting).
         """
-        adf_body = {
-            "body": {
-                "type": "doc",
-                "version": 1,
-                "content": [
-                    {
-                        "type": "paragraph",
-                        "content": [{"type": "text", "text": body}],
-                    }
-                ],
-            }
-        }
-
         response = self._client.put(
             f"/rest/api/3/issue/{issue_key}/comment/{comment_id}",
-            json=adf_body,
+            json={"body": markdown_to_adf(body)},
         )
         response.raise_for_status()
 
@@ -238,17 +212,19 @@ class JiraClient:
         priority: str | None = None,
         labels: list[str] | None = None,
         assignee: str | None = None,
+        parent: str | None = None,
     ) -> str:
-        """Create a new issue.
+        """Create a new issue or subtask.
 
         Args:
             project: Project key (e.g., "PROJ").
             summary: Issue summary/title.
-            issue_type: Issue type (e.g., "Task", "Bug", "Story").
-            description: Issue description (optional).
+            issue_type: Issue type (e.g., "Task", "Bug", "Story", "Sub-task").
+            description: Issue description (supports markdown formatting).
             priority: Priority name (optional).
             labels: List of labels (optional).
             assignee: Assignee account ID or email (optional).
+            parent: Parent issue key for subtasks (e.g., "PROJ-123").
 
         Returns:
             The created issue key (e.g., "PROJ-123").
@@ -259,17 +235,11 @@ class JiraClient:
             "issuetype": {"name": issue_type},
         }
 
+        if parent:
+            fields["parent"] = {"key": parent}
+
         if description:
-            fields["description"] = {
-                "type": "doc",
-                "version": 1,
-                "content": [
-                    {
-                        "type": "paragraph",
-                        "content": [{"type": "text", "text": description}],
-                    }
-                ],
-            }
+            fields["description"] = markdown_to_adf(description)
 
         if priority:
             fields["priority"] = {"name": priority}
@@ -299,7 +269,7 @@ class JiraClient:
         Args:
             issue_key: The issue key (e.g., "PROJ-123").
             summary: New summary (optional).
-            description: New description (optional).
+            description: New description (supports markdown formatting).
             priority: New priority name (optional).
             labels: New labels list (optional).
             assignee: New assignee account ID (optional).
@@ -310,16 +280,7 @@ class JiraClient:
             fields["summary"] = summary
 
         if description is not None:
-            fields["description"] = {
-                "type": "doc",
-                "version": 1,
-                "content": [
-                    {
-                        "type": "paragraph",
-                        "content": [{"type": "text", "text": description}],
-                    }
-                ],
-            }
+            fields["description"] = markdown_to_adf(description)
 
         if priority is not None:
             fields["priority"] = {"name": priority}
@@ -406,6 +367,81 @@ class JiraClient:
         """
         response = self._client.delete(f"/rest/api/3/issue/{issue_key}/comment/{comment_id}")
         response.raise_for_status()
+
+    def get_users(
+        self,
+        query: str | None = None,
+        project: str | None = None,
+        limit: int = 1000,
+        include_apps: bool = False,
+    ) -> list[User]:
+        """Search for users.
+
+        Args:
+            query: Search string to filter users by name or email.
+            project: Project key to get assignable users for.
+            limit: Maximum number of results.
+            include_apps: Include app/bot accounts (default False).
+
+        Returns:
+            List of User objects.
+        """
+        all_users: list[User] = []
+        start_at = 0
+        page_size = min(limit, 1000)
+
+        # Use assignable users endpoint if project is specified
+        if project:
+            endpoint = "/rest/api/3/user/assignable/search"
+        else:
+            endpoint = "/rest/api/3/users/search"
+
+        while len(all_users) < limit:
+            params: dict[str, str | int] = {
+                "maxResults": page_size,
+                "startAt": start_at,
+            }
+            if query:
+                params["query"] = query
+            if project:
+                params["project"] = project
+
+            response = self._client.get(endpoint, params=params)
+            response.raise_for_status()
+
+            page_data = response.json()
+            if not page_data:
+                break
+
+            for user_data in page_data:
+                user = User.from_api_response(user_data)
+                # Filter to real users when not using project-specific search
+                if not project and not include_apps:
+                    if user.account_type != "atlassian":
+                        continue
+                    if not user.email:
+                        continue
+                all_users.append(user)
+                if len(all_users) >= limit:
+                    break
+
+            if len(page_data) < page_size:
+                break
+
+            start_at += page_size
+
+        return all_users
+
+    def get_projects(self) -> list[Project]:
+        """Get all projects visible to the current user.
+
+        Returns:
+            List of Project objects.
+        """
+        response = self._client.get("/rest/api/3/project")
+        response.raise_for_status()
+
+        return [Project.from_api_response(p) for p in response.json()]
 
     def close(self) -> None:
         """Close the HTTP client."""
