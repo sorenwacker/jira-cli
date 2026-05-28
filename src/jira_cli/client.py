@@ -193,7 +193,7 @@ class JiraClient:
         if transition is None:
             available = [t.name for t in transitions]
             raise ValueError(
-                f"Invalid transition '{transition_name}'. " f"Available: {', '.join(available)}"
+                f"Invalid transition '{transition_name}'. Available: {', '.join(available)}"
             )
 
         # Perform transition
