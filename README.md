@@ -1,5 +1,8 @@
 # jira-cli
 
+[![CI](https://github.com/sorenwacker/jira-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/sorenwacker/jira-cli/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/sorenwacker/jira-cli/branch/main/graph/badge.svg)](https://codecov.io/gh/sorenwacker/jira-cli)
+
 CLI tool for managing Jira Cloud issues from the terminal.
 
 ## Installation
