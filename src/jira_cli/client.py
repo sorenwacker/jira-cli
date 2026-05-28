@@ -8,6 +8,18 @@ from jira_cli.adf import markdown_to_adf
 from jira_cli.config import JiraConfig
 from jira_cli.models import Comment, Issue, Project, Transition, User
 
+ISSUE_FIELDS = [
+    "summary",
+    "status",
+    "assignee",
+    "project",
+    "priority",
+    "created",
+    "updated",
+    "description",
+    "attachment",
+]
+
 
 class JiraClient:
     """Client for interacting with Jira Cloud REST API."""
@@ -67,17 +79,7 @@ class JiraClient:
         body = {
             "jql": jql,
             "maxResults": limit,
-            "fields": [
-                "summary",
-                "status",
-                "assignee",
-                "project",
-                "priority",
-                "created",
-                "updated",
-                "description",
-                "attachment",
-            ],
+            "fields": ISSUE_FIELDS,
         }
 
         response = self._client.post("/rest/api/3/search/jql", json=body)
@@ -313,17 +315,7 @@ class JiraClient:
         body = {
             "jql": jql,
             "maxResults": limit,
-            "fields": [
-                "summary",
-                "status",
-                "assignee",
-                "project",
-                "priority",
-                "created",
-                "updated",
-                "description",
-                "attachment",
-            ],
+            "fields": ISSUE_FIELDS,
         }
 
         response = self._client.post("/rest/api/3/search/jql", json=body)

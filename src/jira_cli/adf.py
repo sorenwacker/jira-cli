@@ -222,15 +222,15 @@ def _parse_inline(text: str) -> list[dict[str, Any]]:
     result: list[dict[str, Any]] = []
     pos = 0
 
-    # Combined pattern for all inline elements
+    # Combined pattern with named groups for clarity
     pattern = re.compile(
-        r"(\*\*\*(.+?)\*\*\*)"  # Bold italic ***text***
-        r"|(\*\*(.+?)\*\*)"  # Bold **text**
-        r"|(__(.+?)__)"  # Bold __text__
-        r"|(\*([^*]+?)\*)"  # Italic *text*
-        r"|(_([^_]+?)_)"  # Italic _text_
-        r"|(`([^`]+?)`)"  # Code `text`
-        r"|(\[([^\]]+?)\]\(([^)]+?)\))"  # Link [text](url)
+        r"(?P<bold_italic>\*\*\*(?P<bold_italic_text>.+?)\*\*\*)"
+        r"|(?P<bold_ast>\*\*(?P<bold_ast_text>.+?)\*\*)"
+        r"|(?P<bold_under>__(?P<bold_under_text>.+?)__)"
+        r"|(?P<italic_ast>\*(?P<italic_ast_text>[^*]+?)\*)"
+        r"|(?P<italic_under>_(?P<italic_under_text>[^_]+?)_)"
+        r"|(?P<code>`(?P<code_text>[^`]+?)`)"
+        r"|(?P<link>\[(?P<link_text>[^\]]+?)\]\((?P<link_url>[^)]+?)\))"
     )
 
     for match in pattern.finditer(text):
@@ -240,61 +240,61 @@ def _parse_inline(text: str) -> list[dict[str, Any]]:
             if before:
                 result.append({"type": "text", "text": before})
 
-        # Process the match
-        if match.group(1):  # Bold italic ***
+        # Process the match using named groups
+        if match.group("bold_italic"):
             result.append(
                 {
                     "type": "text",
-                    "text": match.group(2),
+                    "text": match.group("bold_italic_text"),
                     "marks": [{"type": "strong"}, {"type": "em"}],
                 }
             )
-        elif match.group(3):  # Bold **
+        elif match.group("bold_ast"):
             result.append(
                 {
                     "type": "text",
-                    "text": match.group(4),
+                    "text": match.group("bold_ast_text"),
                     "marks": [{"type": "strong"}],
                 }
             )
-        elif match.group(5):  # Bold __
+        elif match.group("bold_under"):
             result.append(
                 {
                     "type": "text",
-                    "text": match.group(6),
+                    "text": match.group("bold_under_text"),
                     "marks": [{"type": "strong"}],
                 }
             )
-        elif match.group(7):  # Italic *
+        elif match.group("italic_ast"):
             result.append(
                 {
                     "type": "text",
-                    "text": match.group(8),
+                    "text": match.group("italic_ast_text"),
                     "marks": [{"type": "em"}],
                 }
             )
-        elif match.group(9):  # Italic _
+        elif match.group("italic_under"):
             result.append(
                 {
                     "type": "text",
-                    "text": match.group(10),
+                    "text": match.group("italic_under_text"),
                     "marks": [{"type": "em"}],
                 }
             )
-        elif match.group(11):  # Code `
+        elif match.group("code"):
             result.append(
                 {
                     "type": "text",
-                    "text": match.group(12),
+                    "text": match.group("code_text"),
                     "marks": [{"type": "code"}],
                 }
             )
-        elif match.group(13):  # Link
+        elif match.group("link"):
             result.append(
                 {
                     "type": "text",
-                    "text": match.group(14),
-                    "marks": [{"type": "link", "attrs": {"href": match.group(15)}}],
+                    "text": match.group("link_text"),
+                    "marks": [{"type": "link", "attrs": {"href": match.group("link_url")}}],
                 }
             )
 

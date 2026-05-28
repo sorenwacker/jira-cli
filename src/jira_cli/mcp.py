@@ -8,6 +8,28 @@ from jira_cli.config import load_config
 mcp = FastMCP("Jira")
 
 
+def _issue_to_dict(issue, full: bool = False) -> dict:
+    """Convert Issue to dictionary for MCP response."""
+    result = {
+        "key": issue.key,
+        "summary": issue.summary,
+        "status": issue.status,
+        "assignee": issue.assignee,
+        "priority": issue.priority,
+    }
+    if full:
+        result.update(
+            {
+                "reporter": issue.reporter,
+                "project": issue.project,
+                "description": issue.description,
+                "created": issue.created.isoformat(),
+                "updated": issue.updated.isoformat(),
+            }
+        )
+    return result
+
+
 def get_client() -> JiraClient:
     """Get a configured Jira client."""
     return JiraClient(load_config())
@@ -25,18 +47,7 @@ def get_issue(issue_key: str) -> dict:
     """
     with get_client() as client:
         issue = client.get_issue(issue_key)
-        return {
-            "key": issue.key,
-            "summary": issue.summary,
-            "status": issue.status,
-            "assignee": issue.assignee,
-            "reporter": issue.reporter,
-            "project": issue.project,
-            "priority": issue.priority,
-            "description": issue.description,
-            "created": issue.created.isoformat(),
-            "updated": issue.updated.isoformat(),
-        }
+        return _issue_to_dict(issue, full=True)
 
 
 @mcp.tool()
@@ -52,16 +63,7 @@ def search_issues(jql: str, limit: int = 50) -> list[dict]:
     """
     with get_client() as client:
         issues = client.search(jql, limit=limit)
-        return [
-            {
-                "key": issue.key,
-                "summary": issue.summary,
-                "status": issue.status,
-                "assignee": issue.assignee,
-                "priority": issue.priority,
-            }
-            for issue in issues
-        ]
+        return [_issue_to_dict(issue) for issue in issues]
 
 
 @mcp.tool()
@@ -82,15 +84,7 @@ def get_my_issues(
     """
     with get_client() as client:
         issues = client.get_my_issues(status=status, project=project, limit=limit)
-        return [
-            {
-                "key": issue.key,
-                "summary": issue.summary,
-                "status": issue.status,
-                "priority": issue.priority,
-            }
-            for issue in issues
-        ]
+        return [_issue_to_dict(issue) for issue in issues]
 
 
 @mcp.tool()

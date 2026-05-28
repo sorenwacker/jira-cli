@@ -48,6 +48,32 @@ issue_app.add_typer(comment_app, name="comment")
 console = Console()
 
 
+def _parse_labels(labels: str | None) -> list[str] | None:
+    """Parse comma-separated labels string into list."""
+    if not labels:
+        return None
+    return [label.strip() for label in labels.split(",")]
+
+
+def _create_issue_table(issues: list, title: str) -> Table:
+    """Create a Rich table for displaying issues."""
+    table = Table(title=title)
+    table.add_column("Key", style="cyan", no_wrap=True)
+    table.add_column("Status", style="magenta")
+    table.add_column("Priority")
+    table.add_column("Summary")
+
+    for issue in issues:
+        table.add_row(
+            issue.key,
+            issue.status,
+            issue.priority or "-",
+            issue.summary[:60] + "..." if len(issue.summary) > 60 else issue.summary,
+        )
+
+    return table
+
+
 def get_client() -> JiraClient:
     """Get a configured Jira client."""
     return JiraClient(load_config())
@@ -67,21 +93,7 @@ def issue_list(
         console.print("[yellow]No issues found[/yellow]")
         return
 
-    table = Table(title="My Issues")
-    table.add_column("Key", style="cyan", no_wrap=True)
-    table.add_column("Status", style="magenta")
-    table.add_column("Priority")
-    table.add_column("Summary")
-
-    for issue in issues:
-        table.add_row(
-            issue.key,
-            issue.status,
-            issue.priority or "-",
-            issue.summary[:60] + "..." if len(issue.summary) > 60 else issue.summary,
-        )
-
-    console.print(table)
+    console.print(_create_issue_table(issues, "My Issues"))
 
 
 @issue_app.command("view")
@@ -224,8 +236,6 @@ def issue_create(
     labels: str | None = typer.Option(None, "--labels", "-l", help="Comma-separated labels"),
 ) -> None:
     """Create a new issue."""
-    label_list = [label.strip() for label in labels.split(",")] if labels else None
-
     with get_client() as client:
         issue_key = client.create_issue(
             project=project,
@@ -233,7 +243,7 @@ def issue_create(
             issue_type=issue_type,
             description=description,
             priority=priority,
-            labels=label_list,
+            labels=_parse_labels(labels),
         )
 
     console.print(f"[green]Created {issue_key}[/green]")
@@ -278,15 +288,13 @@ def issue_edit(
     assignee: str | None = typer.Option(None, "--assignee", "-a", help="New assignee (account ID)"),
 ) -> None:
     """Edit issue fields."""
-    label_list = [label.strip() for label in labels.split(",")] if labels else None
-
     with get_client() as client:
         client.update_issue(
             issue_key,
             summary=summary,
             description=description,
             priority=priority,
-            labels=label_list,
+            labels=_parse_labels(labels),
             assignee=assignee,
         )
 
@@ -306,21 +314,7 @@ def issue_search(
         console.print("[yellow]No issues found[/yellow]")
         return
 
-    table = Table(title="Search Results")
-    table.add_column("Key", style="cyan", no_wrap=True)
-    table.add_column("Status", style="magenta")
-    table.add_column("Priority")
-    table.add_column("Summary")
-
-    for issue in issues:
-        table.add_row(
-            issue.key,
-            issue.status,
-            issue.priority or "-",
-            issue.summary[:60] + "..." if len(issue.summary) > 60 else issue.summary,
-        )
-
-    console.print(table)
+    console.print(_create_issue_table(issues, "Search Results"))
 
 
 @issue_app.command("watch")

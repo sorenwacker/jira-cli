@@ -6,6 +6,11 @@ from typing import Any
 from pydantic import BaseModel
 
 
+def _parse_jira_datetime(value: str) -> datetime:
+    """Parse Jira API datetime string to datetime object."""
+    return datetime.fromisoformat(value.replace("+0000", "+00:00"))
+
+
 class Attachment(BaseModel):
     """Represents a Jira attachment."""
 
@@ -27,7 +32,7 @@ class Attachment(BaseModel):
             mime_type=data["mimeType"],
             content_url=data["content"],
             author=data["author"]["displayName"],
-            created=datetime.fromisoformat(data["created"].replace("+0000", "+00:00")),
+            created=_parse_jira_datetime(data["created"]),
         )
 
 
@@ -80,8 +85,8 @@ class Issue(BaseModel):
             reporter=reporter,
             project=fields["project"]["key"],
             priority=priority,
-            created=datetime.fromisoformat(fields["created"].replace("+0000", "+00:00")),
-            updated=datetime.fromisoformat(fields["updated"].replace("+0000", "+00:00")),
+            created=_parse_jira_datetime(fields["created"]),
+            updated=_parse_jira_datetime(fields["updated"]),
             description=description,
             attachments=attachments,
         )
@@ -104,7 +109,7 @@ class Comment(BaseModel):
             id=data["id"],
             author=data["author"]["displayName"],
             body=body,
-            created=datetime.fromisoformat(data["created"].replace("+0000", "+00:00")),
+            created=_parse_jira_datetime(data["created"]),
         )
 
 
