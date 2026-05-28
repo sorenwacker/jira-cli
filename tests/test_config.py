@@ -81,8 +81,9 @@ api_token = "file-token"
 """
         )
 
+        # Only set JIRA_URL, clear others to test partial override
         env = {"JIRA_URL": "https://env.atlassian.net"}
-        with patch.dict(os.environ, env, clear=False):
+        with patch.dict(os.environ, env, clear=True):
             config = load_config(config_path=config_file)
 
         assert config.url == "https://env.atlassian.net"
