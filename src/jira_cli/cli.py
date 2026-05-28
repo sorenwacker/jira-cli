@@ -345,6 +345,24 @@ def issue_unwatch(
     console.print(f"[green]Stopped watching {issue_key}[/green]")
 
 
+@issue_app.command("delete")
+def issue_delete(
+    issue_key: str = typer.Argument(..., help="Issue key (e.g., PROJ-123)"),
+    force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation"),
+) -> None:
+    """Delete an issue permanently."""
+    if not force:
+        confirm = typer.confirm(f"Delete {issue_key}? This cannot be undone")
+        if not confirm:
+            console.print("[yellow]Cancelled[/yellow]")
+            raise typer.Exit()
+
+    with get_client() as client:
+        client.delete_issue(issue_key)
+
+    console.print(f"[green]Deleted {issue_key}[/green]")
+
+
 @app.command()
 def shell() -> None:
     """Start interactive shell mode."""

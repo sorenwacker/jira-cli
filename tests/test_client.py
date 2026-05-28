@@ -464,6 +464,21 @@ class TestJiraClientDeleteComment:
         assert route.called
 
 
+class TestJiraClientDeleteIssue:
+    """Tests for issue deletion."""
+
+    @respx.mock
+    def test_delete_issue(self, jira_client: JiraClient) -> None:
+        """Can delete an issue."""
+        route = respx.delete("https://test.atlassian.net/rest/api/3/issue/PROJ-123").mock(
+            return_value=httpx.Response(204)
+        )
+
+        jira_client.delete_issue("PROJ-123")
+
+        assert route.called
+
+
 class TestJiraClientAuth:
     """Tests for authentication."""
 

@@ -317,6 +317,21 @@ def unwatch_issue(issue_key: str) -> dict:
         return {"success": True, "issue_key": issue_key, "watching": False}
 
 
+@mcp.tool()
+def delete_issue(issue_key: str) -> dict:
+    """Delete an issue permanently.
+
+    Args:
+        issue_key: The issue key (e.g., "PROJ-123").
+
+    Returns:
+        Success status.
+    """
+    with get_client() as client:
+        client.delete_issue(issue_key)
+        return {"success": True, "issue_key": issue_key, "deleted": True}
+
+
 def main() -> None:
     """Entry point for MCP server."""
     mcp.run()

@@ -367,6 +367,35 @@ class TestMoveCommand:
         assert "transitioned" in result.output.lower() or "In Progress" in result.output
 
 
+class TestDeleteCommand:
+    """Tests for 'jira issue delete' command."""
+
+    def test_delete_issue_with_force(self, mock_config: JiraConfig) -> None:
+        """Delete command with --force skips confirmation."""
+        with patch("jira_cli.cli.load_config", return_value=mock_config):
+            with patch("jira_cli.cli.JiraClient") as mock_client_class:
+                mock_client = create_mock_client()
+                mock_client_class.return_value = mock_client
+
+                result = runner.invoke(app, ["issue", "delete", "PROJ-123", "--force"])
+
+        assert result.exit_code == 0
+        mock_client.delete_issue.assert_called_with("PROJ-123")
+        assert "Deleted PROJ-123" in result.output
+
+    def test_delete_issue_cancelled(self, mock_config: JiraConfig) -> None:
+        """Delete command can be cancelled."""
+        with patch("jira_cli.cli.load_config", return_value=mock_config):
+            with patch("jira_cli.cli.JiraClient") as mock_client_class:
+                mock_client = create_mock_client()
+                mock_client_class.return_value = mock_client
+
+                result = runner.invoke(app, ["issue", "delete", "PROJ-123"], input="n\n")
+
+        assert "Cancelled" in result.output
+        mock_client.delete_issue.assert_not_called()
+
+
 class TestConfigCommand:
     """Tests for 'jira config' command."""
 

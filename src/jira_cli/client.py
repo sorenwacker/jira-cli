@@ -368,6 +368,15 @@ class JiraClient:
         response = self._client.delete(f"/rest/api/3/issue/{issue_key}/comment/{comment_id}")
         response.raise_for_status()
 
+    def delete_issue(self, issue_key: str) -> None:
+        """Delete an issue.
+
+        Args:
+            issue_key: The issue key (e.g., "PROJ-123").
+        """
+        response = self._client.delete(f"/rest/api/3/issue/{issue_key}")
+        response.raise_for_status()
+
     def get_users(
         self,
         query: str | None = None,

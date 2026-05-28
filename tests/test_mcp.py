@@ -373,3 +373,22 @@ class TestUnwatchIssue:
         assert result["success"] is True
         assert result["watching"] is False
         mock_client.unwatch_issue.assert_called_with("PROJ-123")
+
+
+class TestDeleteIssue:
+    """Tests for delete_issue tool."""
+
+    def test_delete_issue(self, mock_config: JiraConfig) -> None:
+        """Can delete an issue."""
+        from jira_cli.mcp import delete_issue
+
+        with patch("jira_cli.mcp.load_config", return_value=mock_config):
+            with patch("jira_cli.mcp.JiraClient") as mock_client_class:
+                mock_client = create_mock_client()
+                mock_client_class.return_value = mock_client
+
+                result = delete_issue("PROJ-123")
+
+        assert result["success"] is True
+        assert result["deleted"] is True
+        mock_client.delete_issue.assert_called_with("PROJ-123")
