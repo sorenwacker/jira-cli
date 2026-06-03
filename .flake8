@@ -1,0 +1,13 @@
+[flake8]
+max-line-length = 88
+select = CFQ
+max-function-length = 32
+max-returns = 4
+max-arguments = 6
+per-file-ignores =
+    ; MCP tools use fastmcp patterns - function args are tool params
+    src/jira_cli/mcp.py:CFQ002
+    ; CLI uses typer patterns - function args are CLI params
+    src/jira_cli/cli.py:CFQ002
+    ; Client params are dataclasses - many init args by design
+    src/jira_cli/client.py:CFQ002

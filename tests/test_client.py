@@ -6,7 +6,13 @@ import httpx
 import pytest
 import respx
 
-from jira_cli.client import JiraClient
+from jira_cli.client import (
+    IssueCreateParams,
+    IssueUpdateParams,
+    JiraClient,
+    UserSearchParams,
+)
+from jira_cli.config import JiraConfig
 
 
 class TestJiraClientSearch:
@@ -104,7 +110,9 @@ class TestJiraClientGetIssue:
     def test_get_issue_not_found(self, jira_client: JiraClient) -> None:
         """Raises error for non-existent issue."""
         respx.get("https://test.atlassian.net/rest/api/3/issue/PROJ-999").mock(
-            return_value=httpx.Response(404, json={"errorMessages": ["Issue not found"]})
+            return_value=httpx.Response(
+                404, json={"errorMessages": ["Issue not found"]}
+            )
         )
 
         with pytest.raises(httpx.HTTPStatusError):
@@ -174,7 +182,9 @@ class TestJiraClientComments:
                         "content": [
                             {
                                 "type": "paragraph",
-                                "content": [{"type": "text", "text": "Updated comment"}],
+                                "content": [
+                                    {"type": "text", "text": "Updated comment"}
+                                ],
                             }
                         ],
                     },
@@ -198,9 +208,9 @@ class TestJiraClientTransitions:
         sample_transitions_response: dict,
     ) -> None:
         """Can retrieve available transitions for an issue."""
-        respx.get("https://test.atlassian.net/rest/api/3/issue/PROJ-123/transitions").mock(
-            return_value=httpx.Response(200, json=sample_transitions_response)
-        )
+        respx.get(
+            "https://test.atlassian.net/rest/api/3/issue/PROJ-123/transitions"
+        ).mock(return_value=httpx.Response(200, json=sample_transitions_response))
 
         transitions = jira_client.get_transitions("PROJ-123")
 
@@ -214,12 +224,12 @@ class TestJiraClientTransitions:
         sample_transitions_response: dict,
     ) -> None:
         """Can transition an issue to a new status."""
-        respx.get("https://test.atlassian.net/rest/api/3/issue/PROJ-123/transitions").mock(
-            return_value=httpx.Response(200, json=sample_transitions_response)
-        )
-        respx.post("https://test.atlassian.net/rest/api/3/issue/PROJ-123/transitions").mock(
-            return_value=httpx.Response(204)
-        )
+        respx.get(
+            "https://test.atlassian.net/rest/api/3/issue/PROJ-123/transitions"
+        ).mock(return_value=httpx.Response(200, json=sample_transitions_response))
+        respx.post(
+            "https://test.atlassian.net/rest/api/3/issue/PROJ-123/transitions"
+        ).mock(return_value=httpx.Response(204))
 
         result = jira_client.transition_issue("PROJ-123", "In Progress")
 
@@ -232,9 +242,9 @@ class TestJiraClientTransitions:
         sample_transitions_response: dict,
     ) -> None:
         """Raises error for invalid transition."""
-        respx.get("https://test.atlassian.net/rest/api/3/issue/PROJ-123/transitions").mock(
-            return_value=httpx.Response(200, json=sample_transitions_response)
-        )
+        respx.get(
+            "https://test.atlassian.net/rest/api/3/issue/PROJ-123/transitions"
+        ).mock(return_value=httpx.Response(200, json=sample_transitions_response))
 
         with pytest.raises(ValueError, match="Invalid transition"):
             jira_client.transition_issue("PROJ-123", "Invalid Status")
@@ -257,12 +267,13 @@ class TestJiraClientCreateIssue:
             )
         )
 
-        issue_key = jira_client.create_issue(
+        params = IssueCreateParams(
             project="PROJ",
             summary="New issue",
             issue_type="Task",
             description="Issue description",
         )
+        issue_key = jira_client.create_issue(params)
 
         assert issue_key == "PROJ-124"
 
@@ -280,11 +291,12 @@ class TestJiraClientCreateIssue:
             )
         )
 
-        issue_key = jira_client.create_issue(
+        params = IssueCreateParams(
             project="PROJ",
             summary="Minimal issue",
             issue_type="Task",
         )
+        issue_key = jira_client.create_issue(params)
 
         assert issue_key == "PROJ-125"
         body = json.loads(route.calls[0].request.content)
@@ -306,12 +318,13 @@ class TestJiraClientCreateIssue:
             )
         )
 
-        issue_key = jira_client.create_issue(
+        params = IssueCreateParams(
             project="PROJ",
             summary="Subtask summary",
             issue_type="Sub-task",
             parent="PROJ-123",
         )
+        issue_key = jira_client.create_issue(params)
 
         assert issue_key == "PROJ-126"
         body = json.loads(route.calls[0].request.content)
@@ -332,13 +345,14 @@ class TestJiraClientCreateIssue:
             )
         )
 
-        issue_key = jira_client.create_issue(
+        params = IssueCreateParams(
             project="PROJ",
             summary="Subtask with details",
             issue_type="Sub-task",
             description="Subtask description",
             parent="PROJ-123",
         )
+        issue_key = jira_client.create_issue(params)
 
         assert issue_key == "PROJ-127"
         body = json.loads(route.calls[0].request.content)
@@ -356,7 +370,8 @@ class TestJiraClientUpdateIssue:
             return_value=httpx.Response(204)
         )
 
-        jira_client.update_issue("PROJ-123", summary="Updated summary")
+        params = IssueUpdateParams(summary="Updated summary")
+        jira_client.update_issue("PROJ-123", params)
 
         body = json.loads(route.calls[0].request.content)
         assert body["fields"]["summary"] == "Updated summary"
@@ -368,7 +383,8 @@ class TestJiraClientUpdateIssue:
             return_value=httpx.Response(204)
         )
 
-        jira_client.update_issue("PROJ-123", priority="High")
+        params = IssueUpdateParams(priority="High")
+        jira_client.update_issue("PROJ-123", params)
 
         body = json.loads(route.calls[0].request.content)
         assert body["fields"]["priority"]["name"] == "High"
@@ -380,7 +396,8 @@ class TestJiraClientUpdateIssue:
             return_value=httpx.Response(204)
         )
 
-        jira_client.update_issue("PROJ-123", assignee="user@example.com")
+        params = IssueUpdateParams(assignee="user@example.com")
+        jira_client.update_issue("PROJ-123", params)
 
         body = json.loads(route.calls[0].request.content)
         assert body["fields"]["assignee"]["id"] == "user@example.com"
@@ -392,7 +409,8 @@ class TestJiraClientUpdateIssue:
             return_value=httpx.Response(204)
         )
 
-        jira_client.update_issue("PROJ-123", labels=["bug", "urgent"])
+        params = IssueUpdateParams(labels=["bug", "urgent"])
+        jira_client.update_issue("PROJ-123", params)
 
         body = json.loads(route.calls[0].request.content)
         assert body["fields"]["labels"] == ["bug", "urgent"]
@@ -425,24 +443,27 @@ class TestJiraClientWatch:
     @respx.mock
     def test_watch_issue(self, jira_client: JiraClient) -> None:
         """Can watch an issue."""
-        route = respx.post("https://test.atlassian.net/rest/api/3/issue/PROJ-123/watchers").mock(
-            return_value=httpx.Response(204)
-        )
+        route = respx.post(
+            "https://test.atlassian.net/rest/api/3/issue/PROJ-123/watchers"
+        ).mock(return_value=httpx.Response(204))
 
         jira_client.watch_issue("PROJ-123")
 
         assert route.called
 
     @respx.mock
-    def test_unwatch_issue(self, jira_client: JiraClient, jira_config) -> None:
+    def test_unwatch_issue(
+        self,
+        jira_client: JiraClient,
+        jira_config: JiraConfig,  # noqa: ARG002
+    ) -> None:
         """Can unwatch an issue."""
-        # First get current user
         respx.get("https://test.atlassian.net/rest/api/3/myself").mock(
             return_value=httpx.Response(200, json={"accountId": "abc123"})
         )
-        route = respx.delete("https://test.atlassian.net/rest/api/3/issue/PROJ-123/watchers").mock(
-            return_value=httpx.Response(204)
-        )
+        route = respx.delete(
+            "https://test.atlassian.net/rest/api/3/issue/PROJ-123/watchers"
+        ).mock(return_value=httpx.Response(204))
 
         jira_client.unwatch_issue("PROJ-123")
 
@@ -470,9 +491,9 @@ class TestJiraClientDeleteIssue:
     @respx.mock
     def test_delete_issue(self, jira_client: JiraClient) -> None:
         """Can delete an issue."""
-        route = respx.delete("https://test.atlassian.net/rest/api/3/issue/PROJ-123").mock(
-            return_value=httpx.Response(204)
-        )
+        route = respx.delete(
+            "https://test.atlassian.net/rest/api/3/issue/PROJ-123"
+        ).mock(return_value=httpx.Response(204))
 
         jira_client.delete_issue("PROJ-123")
 
@@ -546,7 +567,8 @@ class TestJiraClientUsers:
             return_value=httpx.Response(200, json=sample_users_response)
         )
 
-        users = jira_client.get_users()
+        params = UserSearchParams()
+        users = jira_client.get_users(params)
 
         assert len(users) == 2
         assert all(u.account_type == "atlassian" for u in users)
@@ -565,7 +587,8 @@ class TestJiraClientUsers:
             return_value=httpx.Response(200, json=sample_users_response)
         )
 
-        users = jira_client.get_users(include_apps=True)
+        params = UserSearchParams(include_apps=True)
+        users = jira_client.get_users(params)
 
         assert len(users) == 4
         assert any(u.account_type == "app" for u in users)
@@ -582,7 +605,8 @@ class TestJiraClientUsers:
             return_value=httpx.Response(200, json=sample_users_response)
         )
 
-        jira_client.get_users(query="john")
+        params = UserSearchParams(query="john")
+        jira_client.get_users(params)
 
         assert "query=john" in str(route.calls[0].request.url)
 
@@ -597,7 +621,8 @@ class TestJiraClientUsers:
             return_value=httpx.Response(200, json=sample_users_response)
         )
 
-        jira_client.get_users(limit=10)
+        params = UserSearchParams(limit=10)
+        jira_client.get_users(params)
 
         assert "maxResults=10" in str(route.calls[0].request.url)
 
@@ -608,13 +633,13 @@ class TestJiraClientUsers:
         sample_users_response: list[dict],
     ) -> None:
         """Can get assignable users for a project."""
-        route = respx.get("https://test.atlassian.net/rest/api/3/user/assignable/search").mock(
-            return_value=httpx.Response(200, json=sample_users_response)
-        )
+        route = respx.get(
+            "https://test.atlassian.net/rest/api/3/user/assignable/search"
+        ).mock(return_value=httpx.Response(200, json=sample_users_response))
 
-        users = jira_client.get_users(project="PROJ")
+        params = UserSearchParams(project="PROJ")
+        users = jira_client.get_users(params)
 
         assert route.called
         assert "project=PROJ" in str(route.calls[0].request.url)
-        # Project search returns all users without filtering
         assert len(users) == 4

@@ -18,6 +18,7 @@ class TestIssue:
         assert issue.project == "PROJ"
         assert issue.priority == "Medium"
         assert issue.description == "Issue description"
+        assert issue.labels == ["bug", "high-priority"]
 
     def test_from_api_response_no_assignee(self, sample_issue_response: dict) -> None:
         """Issue handles missing assignee."""
@@ -33,7 +34,9 @@ class TestIssue:
 
         assert issue.reporter is None
 
-    def test_from_api_response_no_description(self, sample_issue_response: dict) -> None:
+    def test_from_api_response_no_description(
+        self, sample_issue_response: dict
+    ) -> None:
         """Issue handles missing description."""
         sample_issue_response["fields"]["description"] = None
         issue = Issue.from_api_response(sample_issue_response)
@@ -46,6 +49,20 @@ class TestIssue:
         issue = Issue.from_api_response(sample_issue_response)
 
         assert issue.priority is None
+
+    def test_from_api_response_no_labels(self, sample_issue_response: dict) -> None:
+        """Issue handles missing labels field."""
+        del sample_issue_response["fields"]["labels"]
+        issue = Issue.from_api_response(sample_issue_response)
+
+        assert issue.labels == []
+
+    def test_from_api_response_empty_labels(self, sample_issue_response: dict) -> None:
+        """Issue handles empty labels array."""
+        sample_issue_response["fields"]["labels"] = []
+        issue = Issue.from_api_response(sample_issue_response)
+
+        assert issue.labels == []
 
 
 class TestComment:
@@ -62,7 +79,9 @@ class TestComment:
 
     def test_from_api_response_list(self, sample_comments_response: dict) -> None:
         """Multiple comments can be parsed."""
-        comments = [Comment.from_api_response(c) for c in sample_comments_response["comments"]]
+        comments = [
+            Comment.from_api_response(c) for c in sample_comments_response["comments"]
+        ]
 
         assert len(comments) == 2
         assert comments[0].body == "First comment"
@@ -83,7 +102,8 @@ class TestTransition:
     def test_from_api_response_list(self, sample_transitions_response: dict) -> None:
         """Multiple transitions can be parsed."""
         transitions = [
-            Transition.from_api_response(t) for t in sample_transitions_response["transitions"]
+            Transition.from_api_response(t)
+            for t in sample_transitions_response["transitions"]
         ]
 
         assert len(transitions) == 3
@@ -107,9 +127,13 @@ class TestAttachment:
         )
         assert attachment.author == "Test User"
 
-    def test_from_api_response_list(self, sample_attachment_response: list[dict]) -> None:
+    def test_from_api_response_list(
+        self, sample_attachment_response: list[dict]
+    ) -> None:
         """Multiple attachments can be parsed."""
-        attachments = [Attachment.from_api_response(a) for a in sample_attachment_response]
+        attachments = [
+            Attachment.from_api_response(a) for a in sample_attachment_response
+        ]
 
         assert len(attachments) == 2
         assert attachments[0].filename == "screenshot.png"

@@ -1,36 +1,105 @@
 """Interactive shell for Jira CLI."""
 
+from __future__ import annotations
+
 import cmd
 import shlex
-
-try:
-    import readline
-except ImportError:
-    readline = None  # type: ignore
+import sys
+from typing import TYPE_CHECKING
 
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
-from jira_cli.client import JiraClient
+if TYPE_CHECKING:
+    from jira_cli.client import JiraClient
+    from jira_cli.models import Issue
+
+# Check if readline is available (not on Windows by default)
+HAS_READLINE = "readline" in sys.modules or sys.platform != "win32"
+if HAS_READLINE:
+    try:
+        import readline
+    except ImportError:
+        HAS_READLINE = False
+        readline = None  # type: ignore[assignment]
 
 console = Console()
 
 
+_SIZE_UNITS = [(1024**3, "GB"), (1024**2, "MB"), (1024, "KB")]
+
+
 def _format_size(size_bytes: int) -> str:
     """Format file size in human-readable format."""
-    if size_bytes < 1024:
-        return f"{size_bytes} B"
-    elif size_bytes < 1024 * 1024:
-        return f"{size_bytes / 1024:.1f} KB"
-    elif size_bytes < 1024 * 1024 * 1024:
-        return f"{size_bytes / (1024 * 1024):.1f} MB"
-    else:
-        return f"{size_bytes / (1024 * 1024 * 1024):.1f} GB"
+    for threshold, unit in _SIZE_UNITS:
+        if size_bytes >= threshold:
+            return f"{size_bytes / threshold:.1f} {unit}"
+    return f"{size_bytes} B"
 
 
-class JiraShell(cmd.Cmd):
+def _create_issues_table(issues: list[Issue], title: str) -> Table:
+    """Create a Rich table for displaying issues."""
+    table = Table(title=title)
+    table.add_column("Key", style="cyan", no_wrap=True)
+    table.add_column("Status", style="magenta")
+    table.add_column("Priority")
+    table.add_column("Summary")
+    for issue in issues:
+        summary = _truncate(issue.summary, 50)
+        table.add_row(issue.key, issue.status, issue.priority or "-", summary)
+    return table
+
+
+def _truncate(text: str, length: int) -> str:
+    """Truncate text with ellipsis if needed."""
+    return text[:length] + "..." if len(text) > length else text
+
+
+# Argument mappings: (flags, key, is_int)
+_ARG_MAPPINGS: list[tuple[tuple[str, ...], str, bool]] = [
+    (("--status", "-s"), "status", False),
+    (("--project", "-p"), "project", False),
+    (("--limit", "-l"), "limit", True),
+    (("--type", "-t"), "type", False),
+    (("--description", "-d"), "description", False),
+    (("--summary",), "summary", False),
+    (("--priority",), "priority", False),
+    (("--labels",), "labels", False),
+]
+
+
+def _parse_shell_args(arg: str) -> dict[str, str | int | None]:
+    """Parse shell command arguments."""
+    result: dict[str, str | int | None] = {}
+    try:
+        args = shlex.split(arg)
+    except ValueError:
+        return result
+
+    i = 0
+    while i < len(args):
+        matched = False
+        for flags, key, is_int in _ARG_MAPPINGS:
+            if args[i] in flags and i + 1 < len(args):
+                result[key] = int(args[i + 1]) if is_int else args[i + 1]
+                i += 2
+                matched = True
+                break
+        if not matched:
+            i += 1
+    return result
+
+
+def _strip_quotes(text: str) -> str:
+    """Remove surrounding quotes from text."""
+    if len(text) >= 2 and text[0] in ('"', "'") and text[-1] == text[0]:
+        return text[1:-1]
+    return text
+
+
+class JiraShell(cmd.Cmd):  # pylint: disable=too-many-public-methods
     """Interactive shell for managing Jira issues."""
 
     intro = "Jira interactive shell. Type 'help' for commands, 'quit' to exit."
@@ -44,7 +113,7 @@ class JiraShell(cmd.Cmd):
         super().__init__()
         self.client = client
         self.current_issue: str | None = None
-        self._issue_cache: list[str] = []  # Cache issue keys for completion
+        self._issue_cache: list[str] = []
         self._update_prompt()
 
     def preloop(self) -> None:
@@ -53,193 +122,172 @@ class JiraShell(cmd.Cmd):
             readline.set_completer_delims(" \t\n")
 
     def _refresh_issue_cache(self) -> None:
-        """Refresh the cached list of issue keys (excluding done/closed)."""
+        """Refresh the cached list of issue keys."""
         try:
             issues = self.client.get_my_issues(limit=100)
-            done_statuses = {"done", "closed", "resolved", "cancelled"}
-            self._issue_cache = [i.key for i in issues if i.status.lower() not in done_statuses]
-        except Exception:
+            done = {"done", "closed", "resolved", "cancelled"}
+            self._issue_cache = [i.key for i in issues if i.status.lower() not in done]
+        except Exception:  # noqa: BLE001 - shell should not crash
             pass
 
-    def complete_cd(self, text: str, line: str, begidx: int, endidx: int) -> list[str]:
+    def complete_cd(
+        self,
+        text: str,
+        line: str,  # noqa: ARG002
+        begidx: int,  # noqa: ARG002
+        endidx: int,  # noqa: ARG002
+    ) -> list[str]:
         """Complete issue keys for cd command."""
         if not self._issue_cache:
             self._refresh_issue_cache()
-        text_upper = text.upper()
-        return [k for k in self._issue_cache if k.startswith(text_upper)]
+        return [k for k in self._issue_cache if k.startswith(text.upper())]
 
-    def complete_cat(self, text: str, line: str, begidx: int, endidx: int) -> list[str]:
+    def complete_cat(
+        self,
+        text: str,
+        line: str,
+        begidx: int,
+        endidx: int,
+    ) -> list[str]:
         """Complete issue keys for cat command."""
         return self.complete_cd(text, line, begidx, endidx)
 
-    def complete_show(self, text: str, line: str, begidx: int, endidx: int) -> list[str]:
+    def complete_show(
+        self,
+        text: str,
+        line: str,
+        begidx: int,
+        endidx: int,
+    ) -> list[str]:
         """Complete issue keys for show command."""
         return self.complete_cd(text, line, begidx, endidx)
 
-    def complete_status(self, text: str, line: str, begidx: int, endidx: int) -> list[str]:
+    def complete_status(
+        self,
+        text: str,
+        line: str,  # noqa: ARG002
+        begidx: int,  # noqa: ARG002
+        endidx: int,  # noqa: ARG002
+    ) -> list[str]:
         """Complete status transitions."""
         if not self.current_issue:
             return []
         try:
             transitions = self.client.get_transitions(self.current_issue)
-            return [t.name for t in transitions if t.name.lower().startswith(text.lower())]
-        except Exception:
+        except Exception:  # noqa: BLE001 - completion should not crash
             return []
+        lower_text = text.lower()
+        return [t.name for t in transitions if t.name.lower().startswith(lower_text)]
 
-    def complete_edit(self, text: str, line: str, begidx: int, endidx: int) -> list[str]:
+    def complete_edit(
+        self,
+        text: str,
+        line: str,  # noqa: ARG002
+        begidx: int,  # noqa: ARG002
+        endidx: int,  # noqa: ARG002
+    ) -> list[str]:
         """Complete edit options."""
         options = ["--summary", "--priority", "--labels", "--description"]
         return [o for o in options if o.startswith(text)]
 
-    def complete_new(self, text: str, line: str, begidx: int, endidx: int) -> list[str]:
+    def complete_new(
+        self,
+        text: str,
+        line: str,  # noqa: ARG002
+        begidx: int,  # noqa: ARG002
+        endidx: int,  # noqa: ARG002
+    ) -> list[str]:
         """Complete new issue options."""
-        # Could add project completion here
         options = ["--type", "--description"]
         return [o for o in options if o.startswith(text)]
 
-    def complete_delcomment(self, text: str, line: str, begidx: int, endidx: int) -> list[str]:
+    def complete_delcomment(
+        self,
+        text: str,
+        line: str,  # noqa: ARG002
+        begidx: int,  # noqa: ARG002
+        endidx: int,  # noqa: ARG002
+    ) -> list[str]:
         """Complete comment IDs for delcomment command."""
         if not self.current_issue:
             return []
         try:
             comments = self.client.get_comments(self.current_issue)
             return [c.id for c in comments if c.id.startswith(text)]
-        except Exception:
+        except Exception:  # noqa: BLE001 - completion should not crash
             return []
 
     def _update_prompt(self) -> None:
         """Update the prompt based on current state."""
-        # ANSI color codes
-        cyan = "\033[36m"
-        green = "\033[32m"
-        reset = "\033[0m"
-
+        cyan, green, reset = "\033[36m", "\033[32m", "\033[0m"
         if self.current_issue:
             self.prompt = f"{green}jira{reset}/{cyan}{self.current_issue}{reset}> "
         else:
             self.prompt = f"{green}jira{reset}> "
 
     def do_list(self, arg: str) -> None:
-        """List issues assigned to you. Usage: list [--status STATUS] [--project PROJECT]"""
-        # Parse arguments
-        status = None
-        project = None
-        limit = 50
-
+        """List issues assigned to you."""
+        parsed = _parse_shell_args(arg)
         try:
-            args = shlex.split(arg)
-            i = 0
-            while i < len(args):
-                if args[i] in ("--status", "-s") and i + 1 < len(args):
-                    status = args[i + 1]
-                    i += 2
-                elif args[i] in ("--project", "-p") and i + 1 < len(args):
-                    project = args[i + 1]
-                    i += 2
-                elif args[i] in ("--limit", "-l") and i + 1 < len(args):
-                    limit = int(args[i + 1])
-                    i += 2
-                else:
-                    i += 1
-        except (ValueError, IndexError):
-            pass
-
-        try:
-            issues = self.client.get_my_issues(status=status, project=project, limit=limit)
-        except Exception as e:
+            issues = self.client.get_my_issues(
+                status=parsed.get("status"),  # type: ignore[arg-type]
+                project=parsed.get("project"),  # type: ignore[arg-type]
+                limit=parsed.get("limit", 50),  # type: ignore[arg-type]
+            )
+        except Exception as e:  # noqa: BLE001 - user-facing error
             console.print(f"[red]Error: {e}[/red]")
             return
-
         if not issues:
             console.print("[yellow]No issues found[/yellow]")
             return
-
-        table = Table(title="My Issues")
-        table.add_column("Key", style="cyan", no_wrap=True)
-        table.add_column("Status", style="magenta")
-        table.add_column("Priority")
-        table.add_column("Summary")
-
-        for issue in issues:
-            table.add_row(
-                issue.key,
-                issue.status,
-                issue.priority or "-",
-                issue.summary[:50] + "..." if len(issue.summary) > 50 else issue.summary,
-            )
-
-        console.print(table)
+        console.print(_create_issues_table(issues, "My Issues"))
 
     def do_ls(self, arg: str) -> None:
-        """List issues or show current issue details. Use -a to show all/comments."""
+        """List issues or show current issue details."""
         if self.current_issue:
-            # Inside an issue - show its details
             self._show_issue(self.current_issue)
-            # If -a, also show comments
             if "-a" in arg or "--all" in arg:
                 self.do_comments("")
-            return
         else:
-            # At root - list issues
-            show_all = "-a" in arg or "--all" in arg
+            self._list_issues(show_all="-a" in arg or "--all" in arg)
 
-            try:
-                issues = self.client.get_my_issues(limit=50)
-            except Exception as e:
-                console.print(f"[red]Error: {e}[/red]")
-                return
-
-            # Filter out Done/closed unless -a
-            if not show_all:
-                done_statuses = {"done", "closed", "resolved", "cancelled"}
-                issues = [i for i in issues if i.status.lower() not in done_statuses]
-
-            if not issues:
-                console.print("[yellow]No issues found[/yellow]")
-                return
-
-            table = Table(title="My Issues")
-            table.add_column("Key", style="cyan", no_wrap=True)
-            table.add_column("Status", style="magenta")
-            table.add_column("Priority")
-            table.add_column("Summary")
-
-            for issue in issues:
-                table.add_row(
-                    issue.key,
-                    issue.status,
-                    issue.priority or "-",
-                    issue.summary[:50] + "..." if len(issue.summary) > 50 else issue.summary,
-                )
-
-            console.print(table)
+    def _list_issues(self, *, show_all: bool) -> None:
+        """List issues at root level."""
+        try:
+            issues = self.client.get_my_issues(limit=50)
+        except Exception as e:  # noqa: BLE001 - user-facing error
+            console.print(f"[red]Error: {e}[/red]")
+            return
+        if not show_all:
+            done = {"done", "closed", "resolved", "cancelled"}
+            issues = [i for i in issues if i.status.lower() not in done]
+        if not issues:
+            console.print("[yellow]No issues found[/yellow]")
+            return
+        console.print(_create_issues_table(issues, "My Issues"))
 
     def do_l(self, arg: str) -> None:
         """Alias for ls."""
         self.do_ls(arg)
 
     def do_cd(self, arg: str) -> None:
-        """Change to an issue or back. Usage: cd ISSUE-KEY or cd .."""
+        """Change to an issue or back."""
         arg = arg.strip()
-
         if not arg:
             console.print("[yellow]Usage: cd ISSUE-KEY or cd ..[/yellow]")
             return
-
         if arg == "..":
             self.current_issue = None
             self._update_prompt()
             return
-
-        # Validate issue exists
         try:
             self.client.get_issue(arg.upper())
             self.current_issue = arg.upper()
             self._update_prompt()
-        except Exception:
+        except Exception:  # noqa: BLE001 - user-facing error
             console.print(f"[red]Issue not found: {arg}[/red]")
 
-    def do_pwd(self, arg: str) -> None:
+    def do_pwd(self, arg: str) -> None:  # noqa: ARG002
         """Show current issue."""
         if self.current_issue:
             console.print(f"[cyan]{self.current_issue}[/cyan]")
@@ -250,352 +298,255 @@ class JiraShell(cmd.Cmd):
         """Display issue details."""
         try:
             issue = self.client.get_issue(issue_key)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - user-facing error
             console.print(f"[red]Error: {e}[/red]")
             return
+        content = self._build_issue_content(issue)
+        console.print(Panel(content, title=f"[cyan]{issue.key}[/cyan]"))
 
+    def _build_issue_content(self, issue: Issue) -> Text:
+        """Build Rich Text content for an issue."""
         content = Text()
-        content.append("Summary: ", style="bold")
-        content.append(f"{issue.summary}\n")
-        content.append("Status: ", style="bold")
-        content.append(f"{issue.status}\n")
-        content.append("Priority: ", style="bold")
-        content.append(f"{issue.priority or '-'}\n")
-        content.append("Assignee: ", style="bold")
-        content.append(f"{issue.assignee or 'Unassigned'}\n")
-        content.append("Reporter: ", style="bold")
-        content.append(f"{issue.reporter or 'Unknown'}\n")
-        content.append("Project: ", style="bold")
-        content.append(f"{issue.project}\n")
-        content.append("Created: ", style="bold")
-        content.append(f"{issue.created.strftime('%Y-%m-%d %H:%M')}\n")
-        content.append("Updated: ", style="bold")
-        content.append(f"{issue.updated.strftime('%Y-%m-%d %H:%M')}\n")
-
+        fields = [
+            ("Summary", issue.summary),
+            ("Status", issue.status),
+            ("Priority", issue.priority or "-"),
+            ("Assignee", issue.assignee or "Unassigned"),
+            ("Reporter", issue.reporter or "Unknown"),
+            ("Project", issue.project),
+            ("Created", issue.created.strftime("%Y-%m-%d %H:%M")),
+            ("Updated", issue.updated.strftime("%Y-%m-%d %H:%M")),
+        ]
+        for label, value in fields:
+            content.append(f"{label}: ", style="bold")
+            content.append(f"{value}\n")
         if issue.description:
             content.append("\nDescription:\n", style="bold")
             content.append(issue.description)
-
         if issue.attachments:
             content.append("\n\nAttachments:\n", style="bold")
             for att in issue.attachments:
-                content.append(
-                    f"  - {att.filename} ({_format_size(att.size)})\n    {att.content_url}\n"
-                )
-
-        console.print(Panel(content, title=f"[cyan]{issue.key}[/cyan]"))
+                content.append(f"  - {att.filename} ({_format_size(att.size)})\n")
+                content.append(f"    {att.content_url}\n")
+        return content
 
     def do_show(self, arg: str) -> None:
-        """Show issue details. Usage: show [ISSUE-KEY]"""
+        """Show issue details."""
         issue_key = arg.strip().upper() if arg.strip() else self.current_issue
         if not issue_key:
-            console.print("[yellow]Usage: show ISSUE-KEY or cd into an issue first[/yellow]")
+            console.print("[yellow]Usage: show ISSUE-KEY[/yellow]")
             return
         self._show_issue(issue_key)
 
     def do_cat(self, arg: str) -> None:
-        """Show issue details. Usage: cat [ISSUE-KEY]"""
+        """Show issue details."""
         self.do_show(arg)
 
-    def do_comments(self, arg: str) -> None:
+    def do_comments(self, arg: str) -> None:  # noqa: ARG002
         """Show comments for current issue."""
         if not self.current_issue:
-            console.print("[yellow]No issue selected. Use 'cd ISSUE-KEY' first.[/yellow]")
+            console.print("[yellow]No issue selected.[/yellow]")
             return
-
         try:
             comments = self.client.get_comments(self.current_issue)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - user-facing error
             console.print(f"[red]Error: {e}[/red]")
             return
-
         if not comments:
             console.print("[dim]No comments[/dim]")
             return
-
         console.print(f"[bold]Comments for {self.current_issue}:[/bold]")
         for c in comments:
-            comment_text = Text()
-            comment_text.append(f"{c.author}", style="cyan")
-            comment_text.append(f" - {c.created.strftime('%Y-%m-%d %H:%M')}", style="dim")
-            comment_text.append(f" [id: {c.id}]\n", style="dim")
-            comment_text.append(c.body)
-            console.print(Panel(comment_text))
+            text = Text()
+            text.append(f"{c.author}", style="cyan")
+            text.append(f" - {c.created.strftime('%Y-%m-%d %H:%M')}", style="dim")
+            text.append(f" [id: {c.id}]\n", style="dim")
+            text.append(c.body)
+            console.print(Panel(text))
 
     def do_comment(self, arg: str) -> None:
-        """Add a comment to current issue. Usage: comment "your comment text" """
+        """Add a comment to current issue."""
         if not self.current_issue:
-            console.print("[yellow]No issue selected. Use 'cd ISSUE-KEY' first.[/yellow]")
+            console.print("[yellow]No issue selected.[/yellow]")
             return
-
-        # Handle quoted text
-        text = arg.strip()
+        text = _strip_quotes(arg.strip())
         if not text:
-            console.print('[yellow]Usage: comment "your comment text"[/yellow]')
+            console.print('[yellow]Usage: comment "your text"[/yellow]')
             return
-
-        # Remove surrounding quotes if present
-        if (text.startswith('"') and text.endswith('"')) or (
-            text.startswith("'") and text.endswith("'")
-        ):
-            text = text[1:-1]
-
         try:
             self.client.add_comment(self.current_issue, text)
             console.print(f"[green]Comment added to {self.current_issue}[/green]")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - user-facing error
             console.print(f"[red]Error: {e}[/red]")
 
     def do_status(self, arg: str) -> None:
-        """Show transitions or change status. Usage: status [NEW_STATUS]"""
+        """Show transitions or change status."""
         if not self.current_issue:
-            console.print("[yellow]No issue selected. Use 'cd ISSUE-KEY' first.[/yellow]")
+            console.print("[yellow]No issue selected.[/yellow]")
             return
-
-        target = arg.strip()
-
+        target = _strip_quotes(arg.strip())
         if not target:
-            # Show available transitions
-            try:
-                transitions = self.client.get_transitions(self.current_issue)
-            except Exception as e:
-                console.print(f"[red]Error: {e}[/red]")
-                return
-
-            console.print(f"[bold]Available transitions for {self.current_issue}:[/bold]")
-            for t in transitions:
-                console.print(f"  - {t.name}")
+            self._show_transitions()
         else:
-            # Perform transition
-            # Remove quotes if present
-            if (target.startswith('"') and target.endswith('"')) or (
-                target.startswith("'") and target.endswith("'")
-            ):
-                target = target[1:-1]
+            self._execute_transition(target)
 
-            try:
-                self.client.transition_issue(self.current_issue, target)
-                console.print(f"[green]{self.current_issue} transitioned to '{target}'[/green]")
-            except ValueError as e:
-                console.print(f"[red]{e}[/red]")
-            except Exception as e:
-                console.print(f"[red]Error: {e}[/red]")
+    def _show_transitions(self) -> None:
+        """Show available transitions."""
+        try:
+            transitions = self.client.get_transitions(self.current_issue)  # type: ignore[arg-type]
+        except Exception as e:  # noqa: BLE001 - user-facing error
+            console.print(f"[red]Error: {e}[/red]")
+            return
+        console.print(f"[bold]Available transitions for {self.current_issue}:[/bold]")
+        for t in transitions:
+            console.print(f"  - {t.name}")
+
+    def _execute_transition(self, target: str) -> None:
+        """Execute a status transition."""
+        try:
+            self.client.transition_issue(self.current_issue, target)  # type: ignore[arg-type]
+            msg = f"[green]{self.current_issue} transitioned to '{target}'[/green]"
+            console.print(msg)
+        except ValueError as e:
+            console.print(f"[red]{e}[/red]")
+        except Exception as e:  # noqa: BLE001 - user-facing error
+            console.print(f"[red]Error: {e}[/red]")
 
     def do_new(self, arg: str) -> None:
-        """Create a new issue. Usage: new PROJECT "Summary" [--type TYPE] [--description "desc"]"""
+        """Create a new issue."""
         try:
             args = shlex.split(arg)
         except ValueError:
-            console.print('[yellow]Usage: new PROJECT "Summary" [--type TYPE][/yellow]')
+            console.print('[yellow]Usage: new PROJECT "Summary"[/yellow]')
             return
-
         if len(args) < 2:
-            console.print('[yellow]Usage: new PROJECT "Summary" [--type TYPE][/yellow]')
+            console.print('[yellow]Usage: new PROJECT "Summary"[/yellow]')
             return
+        project, summary = args[0], args[1]
+        parsed = _parse_shell_args(" ".join(args[2:]))
+        self._create_issue(project, summary, parsed)
 
-        project = args[0]
-        summary = args[1]
-        issue_type = "Task"
-        description = None
+    def _create_issue(
+        self,
+        project: str,
+        summary: str,
+        opts: dict[str, str | int | None],
+    ) -> None:
+        """Create an issue with given parameters."""
+        from jira_cli.client import IssueCreateParams
 
-        i = 2
-        while i < len(args):
-            if args[i] in ("--type", "-t") and i + 1 < len(args):
-                issue_type = args[i + 1]
-                i += 2
-            elif args[i] in ("--description", "-d") and i + 1 < len(args):
-                description = args[i + 1]
-                i += 2
-            else:
-                i += 1
-
+        params = IssueCreateParams(
+            project=project,
+            summary=summary,
+            issue_type=opts.get("type", "Task"),  # type: ignore[arg-type]
+            description=opts.get("description"),  # type: ignore[arg-type]
+        )
         try:
-            issue_key = self.client.create_issue(
-                project=project,
-                summary=summary,
-                issue_type=issue_type,
-                description=description,
-            )
+            issue_key = self.client.create_issue(params)
             console.print(f"[green]Created {issue_key}[/green]")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - user-facing error
             console.print(f"[red]Error: {e}[/red]")
 
     def do_edit(self, arg: str) -> None:
-        """Edit current issue. Usage: edit [--summary "new"] [--priority High] [--labels "a,b"]"""
+        """Edit current issue."""
         if not self.current_issue:
-            console.print("[yellow]No issue selected. Use 'cd ISSUE-KEY' first.[/yellow]")
+            console.print("[yellow]No issue selected.[/yellow]")
             return
-
-        try:
-            args = shlex.split(arg)
-        except ValueError:
-            console.print("[red]Invalid arguments[/red]")
+        parsed = _parse_shell_args(arg)
+        keys = ("summary", "priority", "labels", "description")
+        if not any(parsed.get(k) for k in keys):
+            console.print('[yellow]Usage: edit --summary "new"[/yellow]')
             return
+        self._update_issue(parsed)
 
-        summary = None
-        priority = None
+    def _update_issue(self, opts: dict[str, str | int | None]) -> None:
+        """Update current issue with given options."""
+        from jira_cli.client import IssueUpdateParams
+
         labels = None
-        description = None
-
-        i = 0
-        while i < len(args):
-            if args[i] in ("--summary", "-s") and i + 1 < len(args):
-                summary = args[i + 1]
-                i += 2
-            elif args[i] in ("--priority", "-p") and i + 1 < len(args):
-                priority = args[i + 1]
-                i += 2
-            elif args[i] in ("--labels", "-l") and i + 1 < len(args):
-                labels = [label.strip() for label in args[i + 1].split(",")]
-                i += 2
-            elif args[i] in ("--description", "-d") and i + 1 < len(args):
-                description = args[i + 1]
-                i += 2
-            else:
-                i += 1
-
-        if not any([summary, priority, labels, description]):
-            console.print(
-                '[yellow]Usage: edit --summary "new" --priority High --labels "a,b"[/yellow]'
-            )
-            return
-
+        if opts.get("labels"):
+            labels = [label.strip() for label in str(opts["labels"]).split(",")]
+        params = IssueUpdateParams(
+            summary=opts.get("summary"),  # type: ignore[arg-type]
+            priority=opts.get("priority"),  # type: ignore[arg-type]
+            labels=labels,
+            description=opts.get("description"),  # type: ignore[arg-type]
+        )
         try:
-            self.client.update_issue(
-                self.current_issue,
-                summary=summary,
-                priority=priority,
-                labels=labels,
-                description=description,
-            )
+            self.client.update_issue(self.current_issue, params)  # type: ignore[arg-type]
             console.print(f"[green]Updated {self.current_issue}[/green]")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - user-facing error
             console.print(f"[red]Error: {e}[/red]")
 
     def do_search(self, arg: str) -> None:
-        """Search with JQL. Usage: search "project = PROJ AND status = Open" """
-        jql = arg.strip()
+        """Search with JQL."""
+        jql = _strip_quotes(arg.strip())
         if not jql:
             console.print('[yellow]Usage: search "JQL query"[/yellow]')
             return
-
-        # Remove surrounding quotes if present
-        if (jql.startswith('"') and jql.endswith('"')) or (
-            jql.startswith("'") and jql.endswith("'")
-        ):
-            jql = jql[1:-1]
-
         try:
             issues = self.client.search(jql)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - user-facing error
             console.print(f"[red]Error: {e}[/red]")
             return
-
         if not issues:
             console.print("[yellow]No issues found[/yellow]")
             return
+        console.print(_create_issues_table(issues, "Search Results"))
 
-        table = Table(title="Search Results")
-        table.add_column("Key", style="cyan", no_wrap=True)
-        table.add_column("Status", style="magenta")
-        table.add_column("Priority")
-        table.add_column("Summary")
-
-        for issue in issues:
-            table.add_row(
-                issue.key,
-                issue.status,
-                issue.priority or "-",
-                issue.summary[:50] + "..." if len(issue.summary) > 50 else issue.summary,
-            )
-
-        console.print(table)
-
-    def do_watch(self, arg: str) -> None:
+    def do_watch(self, arg: str) -> None:  # noqa: ARG002
         """Watch current issue."""
         if not self.current_issue:
-            console.print("[yellow]No issue selected. Use 'cd ISSUE-KEY' first.[/yellow]")
+            console.print("[yellow]No issue selected.[/yellow]")
             return
-
         try:
             self.client.watch_issue(self.current_issue)
             console.print(f"[green]Now watching {self.current_issue}[/green]")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - user-facing error
             console.print(f"[red]Error: {e}[/red]")
 
-    def do_unwatch(self, arg: str) -> None:
+    def do_unwatch(self, arg: str) -> None:  # noqa: ARG002
         """Stop watching current issue."""
         if not self.current_issue:
-            console.print("[yellow]No issue selected. Use 'cd ISSUE-KEY' first.[/yellow]")
+            console.print("[yellow]No issue selected.[/yellow]")
             return
-
         try:
             self.client.unwatch_issue(self.current_issue)
             console.print(f"[green]Stopped watching {self.current_issue}[/green]")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - user-facing error
             console.print(f"[red]Error: {e}[/red]")
 
     def do_delcomment(self, arg: str) -> None:
-        """Delete a comment. Usage: delcomment COMMENT_ID"""
+        """Delete a comment."""
         if not self.current_issue:
-            console.print("[yellow]No issue selected. Use 'cd ISSUE-KEY' first.[/yellow]")
+            console.print("[yellow]No issue selected.[/yellow]")
             return
-
         comment_id = arg.strip()
         if not comment_id:
             console.print("[yellow]Usage: delcomment COMMENT_ID[/yellow]")
             return
-
         try:
             self.client.delete_comment(self.current_issue, comment_id)
             console.print(f"[green]Comment {comment_id} deleted[/green]")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - user-facing error
             console.print(f"[red]Error: {e}[/red]")
 
     def do_help(self, arg: str) -> None:
         """Show help for commands."""
         if arg:
-            # Show help for specific command
             super().do_help(arg)
             return
-
-        help_text = """
-[bold]Navigation:[/bold]
-  l / ls                  At root: list open issues (-a for all). Inside: show details (-a +comments)
-  list                    List your assigned issues
-  cd ISSUE-KEY            Select an issue (e.g., cd DAT-123)
-  cd .. / ..              Go back to root
-  pwd                     Show current issue
-  search "JQL"            Search with custom JQL
-
-[bold]Issue commands:[/bold]
-  new PROJECT "Summary"   Create new issue (--type TYPE)
-  cat ISSUE-KEY           Show issue details (works from anywhere)
-  cat / show              Show current issue details (when inside issue)
-  edit --summary "new"    Edit fields (--priority, --labels, --description)
-  comments                Show comments
-  comment "text"          Add a comment
-  delcomment ID           Delete a comment
-  status                  Show available transitions
-  status "New Status"     Change status
-  watch / unwatch         Watch/unwatch current issue
-
-[bold]General:[/bold]
-  clear                   Clear the screen
-  h / help                Show this help
-  exit / quit / q         Exit shell
-"""
-        console.print(help_text)
+        console.print(_get_help_text())
 
     def do_h(self, arg: str) -> None:
         """Alias for help."""
         self.do_help(arg)
 
-    def do_clear(self, arg: str) -> None:
+    def do_clear(self, arg: str) -> None:  # noqa: ARG002
         """Clear the screen."""
         console.clear()
 
-    def do_quit(self, arg: str) -> bool:
+    def do_quit(self, arg: str) -> bool:  # noqa: ARG002
         """Exit the shell."""
         console.print("[dim]Goodbye[/dim]")
         return True
@@ -610,19 +561,46 @@ class JiraShell(cmd.Cmd):
 
     def do_EOF(self, arg: str) -> bool:
         """Exit on Ctrl+D."""
-        console.print()  # Newline after ^D
+        console.print()
         return self.do_quit(arg)
 
-    def emptyline(self) -> None:
-        """Do nothing on empty line."""
-        pass
+    def emptyline(self) -> bool:
+        """Do nothing on empty line, return False to continue shell."""
+        return False
 
     def default(self, line: str) -> None:
         """Handle unknown commands."""
-        # Handle .. as cd ..
         if line.strip() == "..":
             self.do_cd("..")
             return
-
         console.print(f"[red]Unknown command: {line}[/red]")
         console.print("[dim]Type 'help' for available commands[/dim]")
+
+
+def _get_help_text() -> str:
+    """Get the help text for the shell."""
+    return """
+[bold]Navigation:[/bold]
+  l / ls                  At root: list open issues (-a for all)
+  list                    List your assigned issues
+  cd ISSUE-KEY            Select an issue (e.g., cd DAT-123)
+  cd .. / ..              Go back to root
+  pwd                     Show current issue
+  search "JQL"            Search with custom JQL
+
+[bold]Issue commands:[/bold]
+  new PROJECT "Summary"   Create new issue (--type TYPE)
+  cat ISSUE-KEY           Show issue details
+  edit --summary "new"    Edit fields (--priority, --labels)
+  comments                Show comments
+  comment "text"          Add a comment
+  delcomment ID           Delete a comment
+  status                  Show available transitions
+  status "New Status"     Change status
+  watch / unwatch         Watch/unwatch current issue
+
+[bold]General:[/bold]
+  clear                   Clear the screen
+  h / help                Show this help
+  exit / quit / q         Exit shell
+"""

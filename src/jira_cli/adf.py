@@ -3,6 +3,39 @@
 import re
 from typing import Any
 
+# Block boundary patterns
+_CODE_FENCE = re.compile(r"^```")
+_HEADING = re.compile(r"^#{1,6}\s+")
+_BULLET = re.compile(r"^[-*]\s+")
+_NUMBERED = re.compile(r"^\d+\.\s+")
+_HRULE = re.compile(r"^(-{3,}|\*{3,}|_{3,})$")
+
+# Block patterns with capture
+_HEADING_FULL = re.compile(r"^(#{1,6})\s+(.+)$")
+_BULLET_ITEM = re.compile(r"^[-*]\s+(.+)$")
+_NUMBERED_ITEM = re.compile(r"^\d+\.\s+(.+)$")
+
+# Inline pattern for markdown formatting
+_INLINE_PATTERN = re.compile(
+    r"(?P<bold_italic>\*\*\*(?P<bold_italic_text>.+?)\*\*\*)"
+    r"|(?P<bold_ast>\*\*(?P<bold_ast_text>.+?)\*\*)"
+    r"|(?P<bold_under>__(?P<bold_under_text>.+?)__)"
+    r"|(?P<italic_ast>\*(?P<italic_ast_text>[^*]+?)\*)"
+    r"|(?P<italic_under>_(?P<italic_under_text>[^_]+?)_)"
+    r"|(?P<code>`(?P<code_text>[^`]+?)`)"
+    r"|(?P<link>\[(?P<link_text>[^\]]+?)\]\((?P<link_url>[^)]+?)\))"
+)
+
+# Inline node type mappings: (group_name, text_group_name, marks)
+_INLINE_NODE_TYPES: list[tuple[str, str, list[str]]] = [
+    ("bold_italic", "bold_italic_text", ["strong", "em"]),
+    ("bold_ast", "bold_ast_text", ["strong"]),
+    ("bold_under", "bold_under_text", ["strong"]),
+    ("italic_ast", "italic_ast_text", ["em"]),
+    ("italic_under", "italic_under_text", ["em"]),
+    ("code", "code_text", ["code"]),
+]
+
 
 def markdown_to_adf(text: str) -> dict[str, Any]:
     """Convert markdown text to Atlassian Document Format.
@@ -28,59 +61,112 @@ def _parse_blocks(text: str) -> list[dict[str, Any]]:
 
     while i < len(lines):
         line = lines[i]
-
-        # Skip empty lines
         if not line.strip():
             i += 1
             continue
 
-        # Code block
-        if line.startswith("```"):
-            block, i = _parse_code_block(lines, i)
+        block, i = _parse_single_block(lines, i, line)
+        if block:
             blocks.append(block)
-            continue
-
-        # Heading
-        if match := re.match(r"^(#{1,6})\s+(.+)$", line):
-            level = len(match.group(1))
-            content = _parse_inline(match.group(2))
-            blocks.append(
-                {
-                    "type": "heading",
-                    "attrs": {"level": level},
-                    "content": content,
-                }
-            )
-            i += 1
-            continue
-
-        # Horizontal rule
-        if re.match(r"^(-{3,}|\*{3,}|_{3,})$", line.strip()):
-            blocks.append({"type": "rule"})
-            i += 1
-            continue
-
-        # Bullet list
-        if re.match(r"^[-*]\s+", line):
-            block, i = _parse_bullet_list(lines, i)
-            blocks.append(block)
-            continue
-
-        # Numbered list
-        if re.match(r"^\d+\.\s+", line):
-            block, i = _parse_ordered_list(lines, i)
-            blocks.append(block)
-            continue
-
-        # Paragraph - collect lines until blank line or block element
-        para_lines, i = _collect_paragraph_lines(lines, i)
-        if para_lines:
-            para_text = "\n".join(para_lines)
-            content = _parse_inline_with_breaks(para_text)
-            if content:
-                blocks.append({"type": "paragraph", "content": content})
 
     return blocks
+
+
+def _parse_single_block(
+    lines: list[str],
+    i: int,
+    line: str,
+) -> tuple[dict[str, Any] | None, int]:
+    """Parse a single block element using dispatch."""
+    # Try each block type in order
+    for parser in _BLOCK_PARSERS:
+        result = parser(lines, i, line)
+        if result is not None:
+            return result
+    return _parse_paragraph(lines, i)
+
+
+def _try_code_block(
+    lines: list[str],
+    i: int,
+    line: str,
+) -> tuple[dict[str, Any], int] | None:
+    """Try to parse a code block."""
+    if not line.startswith("```"):
+        return None
+    return _parse_code_block(lines, i)
+
+
+def _try_heading(
+    lines: list[str],  # noqa: ARG001
+    i: int,
+    line: str,
+) -> tuple[dict[str, Any], int] | None:
+    """Try to parse a heading."""
+    match = _HEADING_FULL.match(line)
+    if not match:
+        return None
+    level = len(match.group(1))
+    content = _parse_inline(match.group(2))
+    return {"type": "heading", "attrs": {"level": level}, "content": content}, i + 1
+
+
+def _try_hrule(
+    lines: list[str],  # noqa: ARG001
+    i: int,
+    line: str,
+) -> tuple[dict[str, Any], int] | None:
+    """Try to parse a horizontal rule."""
+    if not _HRULE.match(line.strip()):
+        return None
+    return {"type": "rule"}, i + 1
+
+
+def _try_bullet_list(
+    lines: list[str],
+    i: int,
+    line: str,
+) -> tuple[dict[str, Any], int] | None:
+    """Try to parse a bullet list."""
+    if not _BULLET.match(line):
+        return None
+    return _parse_bullet_list(lines, i)
+
+
+def _try_ordered_list(
+    lines: list[str],
+    i: int,
+    line: str,
+) -> tuple[dict[str, Any], int] | None:
+    """Try to parse an ordered list."""
+    if not _NUMBERED.match(line):
+        return None
+    return _parse_ordered_list(lines, i)
+
+
+# Block parser dispatch table
+_BLOCK_PARSERS = [
+    _try_code_block,
+    _try_heading,
+    _try_hrule,
+    _try_bullet_list,
+    _try_ordered_list,
+]
+
+
+def _parse_paragraph(
+    lines: list[str],
+    start: int,
+) -> tuple[dict[str, Any] | None, int]:
+    """Parse a paragraph block."""
+    para_lines, i = _collect_paragraph_lines(lines, start)
+    if not para_lines:
+        return None, i
+    para_text = "\n".join(para_lines)
+    content = _parse_inline_with_breaks(para_text)
+    if not content:
+        return None, i
+    return {"type": "paragraph", "content": content}, i
 
 
 def _parse_code_block(lines: list[str], start: int) -> tuple[dict[str, Any], int]:
@@ -115,20 +201,12 @@ def _parse_bullet_list(lines: list[str], start: int) -> tuple[dict[str, Any], in
 
     while i < len(lines):
         line = lines[i]
-        if match := re.match(r"^[-*]\s+(.+)$", line):
-            item_text = match.group(1)
-            item_content = _parse_inline(item_text)
-            items.append(
-                {
-                    "type": "listItem",
-                    "content": [{"type": "paragraph", "content": item_content}],
-                }
-            )
+        if match := _BULLET_ITEM.match(line):
+            items.append(_create_list_item(match.group(1)))
             i += 1
         elif not line.strip():
-            # Empty line might end the list
-            if i + 1 < len(lines) and re.match(r"^[-*]\s+", lines[i + 1]):
-                i += 1  # Skip empty line, continue list
+            if i + 1 < len(lines) and _BULLET.match(lines[i + 1]):
+                i += 1
             else:
                 break
         else:
@@ -144,19 +222,11 @@ def _parse_ordered_list(lines: list[str], start: int) -> tuple[dict[str, Any], i
 
     while i < len(lines):
         line = lines[i]
-        if match := re.match(r"^\d+\.\s+(.+)$", line):
-            item_text = match.group(1)
-            item_content = _parse_inline(item_text)
-            items.append(
-                {
-                    "type": "listItem",
-                    "content": [{"type": "paragraph", "content": item_content}],
-                }
-            )
+        if match := _NUMBERED_ITEM.match(line):
+            items.append(_create_list_item(match.group(1)))
             i += 1
         elif not line.strip():
-            # Empty line might end the list
-            if i + 1 < len(lines) and re.match(r"^\d+\.\s+", lines[i + 1]):
+            if i + 1 < len(lines) and _NUMBERED.match(lines[i + 1]):
                 i += 1
             else:
                 break
@@ -166,6 +236,15 @@ def _parse_ordered_list(lines: list[str], start: int) -> tuple[dict[str, Any], i
     return {"type": "orderedList", "content": items}, i
 
 
+def _create_list_item(text: str) -> dict[str, Any]:
+    """Create a list item node."""
+    content = _parse_inline(text)
+    return {
+        "type": "listItem",
+        "content": [{"type": "paragraph", "content": content}],
+    }
+
+
 def _collect_paragraph_lines(lines: list[str], start: int) -> tuple[list[str], int]:
     """Collect lines that form a paragraph."""
     para_lines = []
@@ -173,26 +252,25 @@ def _collect_paragraph_lines(lines: list[str], start: int) -> tuple[list[str], i
 
     while i < len(lines):
         line = lines[i]
-
-        # Stop at block-level elements
-        if not line.strip():
-            i += 1
+        if _is_block_boundary(line):
+            if not line.strip():
+                i += 1
             break
-        if line.startswith("```"):
-            break
-        if re.match(r"^#{1,6}\s+", line):
-            break
-        if re.match(r"^[-*]\s+", line):
-            break
-        if re.match(r"^\d+\.\s+", line):
-            break
-        if re.match(r"^(-{3,}|\*{3,}|_{3,})$", line.strip()):
-            break
-
         para_lines.append(line)
         i += 1
 
     return para_lines, i
+
+
+def _is_block_boundary(line: str) -> bool:
+    """Check if line is a block boundary."""
+    stripped = line.strip()
+    if not stripped:
+        return True
+    patterns = [_CODE_FENCE, _HEADING, _BULLET, _NUMBERED]
+    if any(p.match(line) for p in patterns):
+        return True
+    return bool(_HRULE.match(stripped))
 
 
 def _parse_inline_with_breaks(text: str) -> list[dict[str, Any]]:
@@ -202,12 +280,10 @@ def _parse_inline_with_breaks(text: str) -> list[dict[str, Any]]:
 
     for idx, part in enumerate(parts):
         if part:
-            inline_content = _parse_inline(part)
-            result.extend(inline_content)
+            result.extend(_parse_inline(part))
         if idx < len(parts) - 1:
             result.append({"type": "hardBreak"})
 
-    # Remove trailing hardBreak
     if result and result[-1].get("type") == "hardBreak":
         result.pop()
 
@@ -222,92 +298,46 @@ def _parse_inline(text: str) -> list[dict[str, Any]]:
     result: list[dict[str, Any]] = []
     pos = 0
 
-    # Combined pattern with named groups for clarity
-    pattern = re.compile(
-        r"(?P<bold_italic>\*\*\*(?P<bold_italic_text>.+?)\*\*\*)"
-        r"|(?P<bold_ast>\*\*(?P<bold_ast_text>.+?)\*\*)"
-        r"|(?P<bold_under>__(?P<bold_under_text>.+?)__)"
-        r"|(?P<italic_ast>\*(?P<italic_ast_text>[^*]+?)\*)"
-        r"|(?P<italic_under>_(?P<italic_under_text>[^_]+?)_)"
-        r"|(?P<code>`(?P<code_text>[^`]+?)`)"
-        r"|(?P<link>\[(?P<link_text>[^\]]+?)\]\((?P<link_url>[^)]+?)\))"
-    )
-
-    for match in pattern.finditer(text):
-        # Add text before this match
+    for match in _INLINE_PATTERN.finditer(text):
         if match.start() > pos:
-            before = text[pos : match.start()]
-            if before:
-                result.append({"type": "text", "text": before})
-
-        # Process the match using named groups
-        if match.group("bold_italic"):
-            result.append(
-                {
-                    "type": "text",
-                    "text": match.group("bold_italic_text"),
-                    "marks": [{"type": "strong"}, {"type": "em"}],
-                }
-            )
-        elif match.group("bold_ast"):
-            result.append(
-                {
-                    "type": "text",
-                    "text": match.group("bold_ast_text"),
-                    "marks": [{"type": "strong"}],
-                }
-            )
-        elif match.group("bold_under"):
-            result.append(
-                {
-                    "type": "text",
-                    "text": match.group("bold_under_text"),
-                    "marks": [{"type": "strong"}],
-                }
-            )
-        elif match.group("italic_ast"):
-            result.append(
-                {
-                    "type": "text",
-                    "text": match.group("italic_ast_text"),
-                    "marks": [{"type": "em"}],
-                }
-            )
-        elif match.group("italic_under"):
-            result.append(
-                {
-                    "type": "text",
-                    "text": match.group("italic_under_text"),
-                    "marks": [{"type": "em"}],
-                }
-            )
-        elif match.group("code"):
-            result.append(
-                {
-                    "type": "text",
-                    "text": match.group("code_text"),
-                    "marks": [{"type": "code"}],
-                }
-            )
-        elif match.group("link"):
-            result.append(
-                {
-                    "type": "text",
-                    "text": match.group("link_text"),
-                    "marks": [{"type": "link", "attrs": {"href": match.group("link_url")}}],
-                }
-            )
-
+            result.append({"type": "text", "text": text[pos : match.start()]})
+        node = _create_inline_node(match)
+        if node:
+            result.append(node)
         pos = match.end()
 
-    # Add remaining text
     if pos < len(text):
-        remaining = text[pos:]
-        if remaining:
-            result.append({"type": "text", "text": remaining})
+        result.append({"type": "text", "text": text[pos:]})
 
-    # If no matches, return the whole text
     if not result and text:
         result.append({"type": "text", "text": text})
 
     return result
+
+
+def _create_inline_node(match: re.Match[str]) -> dict[str, Any] | None:
+    """Create an inline node from a regex match using dispatch table."""
+    # Check standard text marks
+    for group_name, text_group, marks in _INLINE_NODE_TYPES:
+        if match.group(group_name):
+            return _text_with_marks(match.group(text_group), marks)
+
+    # Handle link separately (has attrs)
+    if match.group("link"):
+        return _create_link_node(match)
+
+    return None
+
+
+def _text_with_marks(text: str, marks: list[str]) -> dict[str, Any]:
+    """Create a text node with marks."""
+    return {"type": "text", "text": text, "marks": [{"type": m} for m in marks]}
+
+
+def _create_link_node(match: re.Match[str]) -> dict[str, Any]:
+    """Create a link node from a regex match."""
+    return {
+        "type": "text",
+        "text": match.group("link_text"),
+        "marks": [{"type": "link", "attrs": {"href": match.group("link_url")}}],
+    }

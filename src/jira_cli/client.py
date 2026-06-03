@@ -1,6 +1,8 @@
 """Jira API client."""
 
 import base64
+from dataclasses import dataclass, field
+from typing import Any, Self
 
 import httpx
 
@@ -18,6 +20,8 @@ ISSUE_FIELDS = [
     "updated",
     "description",
     "attachment",
+    "labels",
+    "reporter",
 ]
 
 
@@ -64,27 +68,27 @@ class JiraClient:
         Returns:
             List of Issue objects.
         """
-        # Build JQL query
-        jql_parts = ["assignee = currentUser()"]
+        jql = self._build_my_issues_jql(status, project)
+        return self._search_issues(jql, limit)
 
+    def _build_my_issues_jql(
+        self,
+        status: str | None,
+        project: str | None,
+    ) -> str:
+        """Build JQL query for my issues."""
+        jql_parts = ["assignee = currentUser()"]
         if status:
             jql_parts.append(f'status = "{status}"')
-
         if project:
             jql_parts.append(f"project = {project}")
+        return " AND ".join(jql_parts)
 
-        jql = " AND ".join(jql_parts)
-
-        # Build request body (POST required for Jira Cloud search)
-        body = {
-            "jql": jql,
-            "maxResults": limit,
-            "fields": ISSUE_FIELDS,
-        }
-
+    def _search_issues(self, jql: str, limit: int) -> list[Issue]:
+        """Execute a JQL search and return issues."""
+        body = {"jql": jql, "maxResults": limit, "fields": ISSUE_FIELDS}
         response = self._client.post("/rest/api/3/search/jql", json=body)
         response.raise_for_status()
-
         data = response.json()
         return [Issue.from_api_response(issue) for issue in data["issues"]]
 
@@ -102,7 +106,6 @@ class JiraClient:
         """
         response = self._client.get(f"/rest/api/3/issue/{issue_key}")
         response.raise_for_status()
-
         return Issue.from_api_response(response.json())
 
     def get_comments(self, issue_key: str) -> list[Comment]:
@@ -116,7 +119,6 @@ class JiraClient:
         """
         response = self._client.get(f"/rest/api/3/issue/{issue_key}/comment")
         response.raise_for_status()
-
         data = response.json()
         return [Comment.from_api_response(c) for c in data["comments"]]
 
@@ -135,7 +137,6 @@ class JiraClient:
             json={"body": markdown_to_adf(body)},
         )
         response.raise_for_status()
-
         return Comment.from_api_response(response.json())
 
     def update_comment(self, issue_key: str, comment_id: str, body: str) -> None:
@@ -163,7 +164,6 @@ class JiraClient:
         """
         response = self._client.get(f"/rest/api/3/issue/{issue_key}/transitions")
         response.raise_for_status()
-
         data = response.json()
         return [Transition.from_api_response(t) for t in data["transitions"]]
 
@@ -180,127 +180,92 @@ class JiraClient:
         Raises:
             ValueError: If the transition name is not valid.
         """
-        # Get available transitions
+        transition = self._find_transition(issue_key, transition_name)
+        self._execute_transition(issue_key, transition.id)
+        return True
+
+    def _find_transition(self, issue_key: str, name: str) -> Transition:
+        """Find a transition by name."""
         transitions = self.get_transitions(issue_key)
-
-        # Find matching transition
-        transition = None
         for t in transitions:
-            if t.name.lower() == transition_name.lower():
-                transition = t
-                break
+            if t.name.lower() == name.lower():
+                return t
+        available = [t.name for t in transitions]
+        msg = f"Invalid transition '{name}'. Available: {', '.join(available)}"
+        raise ValueError(msg)
 
-        if transition is None:
-            available = [t.name for t in transitions]
-            raise ValueError(
-                f"Invalid transition '{transition_name}'. Available: {', '.join(available)}"
-            )
-
-        # Perform transition
+    def _execute_transition(self, issue_key: str, transition_id: str) -> None:
+        """Execute a transition on an issue."""
         response = self._client.post(
             f"/rest/api/3/issue/{issue_key}/transitions",
-            json={"transition": {"id": transition.id}},
+            json={"transition": {"id": transition_id}},
         )
         response.raise_for_status()
 
-        return True
-
-    def create_issue(
-        self,
-        project: str,
-        summary: str,
-        issue_type: str,
-        description: str | None = None,
-        priority: str | None = None,
-        labels: list[str] | None = None,
-        assignee: str | None = None,
-        parent: str | None = None,
-    ) -> str:
+    def create_issue(self, params: "IssueCreateParams") -> str:
         """Create a new issue or subtask.
 
         Args:
-            project: Project key (e.g., "PROJ").
-            summary: Issue summary/title.
-            issue_type: Issue type (e.g., "Task", "Bug", "Story", "Sub-task").
-            description: Issue description (supports markdown formatting).
-            priority: Priority name (optional).
-            labels: List of labels (optional).
-            assignee: Assignee account ID or email (optional).
-            parent: Parent issue key for subtasks (e.g., "PROJ-123").
+            params: Issue creation parameters.
 
         Returns:
             The created issue key (e.g., "PROJ-123").
         """
-        fields: dict = {
-            "project": {"key": project},
-            "summary": summary,
-            "issuetype": {"name": issue_type},
-        }
-
-        if parent:
-            fields["parent"] = {"key": parent}
-
-        if description:
-            fields["description"] = markdown_to_adf(description)
-
-        if priority:
-            fields["priority"] = {"name": priority}
-
-        if labels:
-            fields["labels"] = labels
-
-        if assignee:
-            fields["assignee"] = {"id": assignee}
-
+        fields = self._build_create_fields(params)
         response = self._client.post("/rest/api/3/issue", json={"fields": fields})
         response.raise_for_status()
+        key: str = response.json()["key"]
+        return key
 
-        return response.json()["key"]
+    def _build_create_fields(self, params: "IssueCreateParams") -> dict[str, Any]:
+        """Build fields dict for issue creation."""
+        fields: dict[str, Any] = {
+            "project": {"key": params.project},
+            "summary": params.summary,
+            "issuetype": {"name": params.issue_type},
+        }
+        if params.parent:
+            fields["parent"] = {"key": params.parent}
+        if params.description:
+            fields["description"] = markdown_to_adf(params.description)
+        if params.priority:
+            fields["priority"] = {"name": params.priority}
+        if params.labels:
+            fields["labels"] = params.labels
+        if params.assignee:
+            fields["assignee"] = {"id": params.assignee}
+        return fields
 
-    def update_issue(
-        self,
-        issue_key: str,
-        summary: str | None = None,
-        description: str | None = None,
-        priority: str | None = None,
-        labels: list[str] | None = None,
-        assignee: str | None = None,
-    ) -> None:
+    def update_issue(self, issue_key: str, params: "IssueUpdateParams") -> None:
         """Update an issue's fields.
 
         Args:
             issue_key: The issue key (e.g., "PROJ-123").
-            summary: New summary (optional).
-            description: New description (supports markdown formatting).
-            priority: New priority name (optional).
-            labels: New labels list (optional).
-            assignee: New assignee account ID (optional).
+            params: Issue update parameters.
         """
-        fields: dict = {}
-
-        if summary is not None:
-            fields["summary"] = summary
-
-        if description is not None:
-            fields["description"] = markdown_to_adf(description)
-
-        if priority is not None:
-            fields["priority"] = {"name": priority}
-
-        if labels is not None:
-            fields["labels"] = labels
-
-        if assignee is not None:
-            fields["assignee"] = {"id": assignee}
-
+        fields = self._build_update_fields(params)
         if not fields:
             return
-
         response = self._client.put(
             f"/rest/api/3/issue/{issue_key}",
             json={"fields": fields},
         )
         response.raise_for_status()
+
+    def _build_update_fields(self, params: "IssueUpdateParams") -> dict[str, Any]:
+        """Build fields dict for issue update."""
+        fields: dict[str, Any] = {}
+        if params.summary is not None:
+            fields["summary"] = params.summary
+        if params.description is not None:
+            fields["description"] = markdown_to_adf(params.description)
+        if params.priority is not None:
+            fields["priority"] = {"name": params.priority}
+        if params.labels is not None:
+            fields["labels"] = params.labels
+        if params.assignee is not None:
+            fields["assignee"] = {"id": params.assignee}
+        return fields
 
     def search(self, jql: str, limit: int = 50) -> list[Issue]:
         """Search issues with custom JQL.
@@ -312,17 +277,7 @@ class JiraClient:
         Returns:
             List of Issue objects.
         """
-        body = {
-            "jql": jql,
-            "maxResults": limit,
-            "fields": ISSUE_FIELDS,
-        }
-
-        response = self._client.post("/rest/api/3/search/jql", json=body)
-        response.raise_for_status()
-
-        data = response.json()
-        return [Issue.from_api_response(issue) for issue in data["issues"]]
+        return self._search_issues(jql, limit)
 
     def watch_issue(self, issue_key: str) -> None:
         """Add current user as watcher.
@@ -339,16 +294,19 @@ class JiraClient:
         Args:
             issue_key: The issue key (e.g., "PROJ-123").
         """
-        # Get current user's account ID
-        me_response = self._client.get("/rest/api/3/myself")
-        me_response.raise_for_status()
-        account_id = me_response.json()["accountId"]
-
+        account_id = self._get_current_user_id()
         response = self._client.delete(
             f"/rest/api/3/issue/{issue_key}/watchers",
             params={"accountId": account_id},
         )
         response.raise_for_status()
+
+    def _get_current_user_id(self) -> str:
+        """Get the current user's account ID."""
+        response = self._client.get("/rest/api/3/myself")
+        response.raise_for_status()
+        account_id: str = response.json()["accountId"]
+        return account_id
 
     def delete_comment(self, issue_key: str, comment_id: str) -> None:
         """Delete a comment.
@@ -357,7 +315,8 @@ class JiraClient:
             issue_key: The issue key (e.g., "PROJ-123").
             comment_id: The comment ID.
         """
-        response = self._client.delete(f"/rest/api/3/issue/{issue_key}/comment/{comment_id}")
+        url = f"/rest/api/3/issue/{issue_key}/comment/{comment_id}"
+        response = self._client.delete(url)
         response.raise_for_status()
 
     def delete_issue(self, issue_key: str) -> None:
@@ -369,69 +328,77 @@ class JiraClient:
         response = self._client.delete(f"/rest/api/3/issue/{issue_key}")
         response.raise_for_status()
 
-    def get_users(
-        self,
-        query: str | None = None,
-        project: str | None = None,
-        limit: int = 1000,
-        include_apps: bool = False,
-    ) -> list[User]:
+    def get_users(self, params: "UserSearchParams") -> list[User]:
         """Search for users.
 
         Args:
-            query: Search string to filter users by name or email.
-            project: Project key to get assignable users for.
-            limit: Maximum number of results.
-            include_apps: Include app/bot accounts (default False).
+            params: User search parameters.
 
         Returns:
             List of User objects.
         """
         all_users: list[User] = []
         start_at = 0
-        page_size = min(limit, 1000)
+        page_size = min(params.limit, 1000)
+        endpoint = self._get_users_endpoint(params.project)
 
-        # Use assignable users endpoint if project is specified
-        if project:
-            endpoint = "/rest/api/3/user/assignable/search"
-        else:
-            endpoint = "/rest/api/3/users/search"
-
-        while len(all_users) < limit:
-            params: dict[str, str | int] = {
-                "maxResults": page_size,
-                "startAt": start_at,
-            }
-            if query:
-                params["query"] = query
-            if project:
-                params["project"] = project
-
-            response = self._client.get(endpoint, params=params)
-            response.raise_for_status()
-
-            page_data = response.json()
-            if not page_data:
+        while len(all_users) < params.limit:
+            page = self._fetch_users_page(endpoint, params, start_at, page_size)
+            if not page:
                 break
-
-            for user_data in page_data:
-                user = User.from_api_response(user_data)
-                # Filter to real users when not using project-specific search
-                if not project and not include_apps:
-                    if user.account_type != "atlassian":
-                        continue
-                    if not user.email:
-                        continue
-                all_users.append(user)
-                if len(all_users) >= limit:
-                    break
-
-            if len(page_data) < page_size:
+            users = self._filter_users(page, params)
+            all_users.extend(users)
+            if len(all_users) >= params.limit or len(page) < page_size:
                 break
-
             start_at += page_size
 
-        return all_users
+        return all_users[: params.limit]
+
+    def _get_users_endpoint(self, project: str | None) -> str:
+        """Get the appropriate users endpoint."""
+        if project:
+            return "/rest/api/3/user/assignable/search"
+        return "/rest/api/3/users/search"
+
+    def _fetch_users_page(
+        self,
+        endpoint: str,
+        params: "UserSearchParams",
+        start_at: int,
+        page_size: int,
+    ) -> list[dict[str, Any]]:
+        """Fetch a page of users from the API."""
+        request_params: dict[str, str | int] = {
+            "maxResults": page_size,
+            "startAt": start_at,
+        }
+        if params.query:
+            request_params["query"] = params.query
+        if params.project:
+            request_params["project"] = params.project
+        response = self._client.get(endpoint, params=request_params)
+        response.raise_for_status()
+        result: list[dict[str, Any]] = response.json()
+        return result
+
+    def _filter_users(
+        self,
+        page_data: list[dict[str, Any]],
+        params: "UserSearchParams",
+    ) -> list[User]:
+        """Filter and convert user data to User objects."""
+        users = []
+        for user_data in page_data:
+            user = User.from_api_response(user_data)
+            should_skip = (
+                not params.project
+                and not params.include_apps
+                and (user.account_type != "atlassian" or not user.email)
+            )
+            if should_skip:
+                continue
+            users.append(user)
+        return users
 
     def get_projects(self) -> list[Project]:
         """Get all projects visible to the current user.
@@ -441,17 +408,58 @@ class JiraClient:
         """
         response = self._client.get("/rest/api/3/project")
         response.raise_for_status()
-
         return [Project.from_api_response(p) for p in response.json()]
 
     def close(self) -> None:
         """Close the HTTP client."""
         self._client.close()
 
-    def __enter__(self) -> "JiraClient":
+    def __enter__(self) -> Self:
         """Context manager entry."""
         return self
 
     def __exit__(self, *args: object) -> None:
         """Context manager exit."""
         self.close()
+
+
+@dataclass
+class IssueCreateParams:  # pylint: disable=too-many-instance-attributes
+    """Parameters for creating an issue."""
+
+    project: str
+    summary: str
+    issue_type: str = "Task"
+    description: str | None = None
+    priority: str | None = None
+    labels: list[str] | None = field(default=None)
+    assignee: str | None = None
+    parent: str | None = None
+
+
+@dataclass
+class IssueUpdateParams:
+    """Parameters for updating an issue."""
+
+    summary: str | None = None
+    description: str | None = None
+    priority: str | None = None
+    labels: list[str] | None = field(default=None)
+    assignee: str | None = None
+
+
+class UserSearchParams:
+    """Parameters for searching users."""
+
+    def __init__(
+        self,
+        query: str | None = None,
+        project: str | None = None,
+        limit: int = 1000,
+        include_apps: bool = False,
+    ) -> None:
+        """Initialize user search parameters."""
+        self.query = query
+        self.project = project
+        self.limit = limit
+        self.include_apps = include_apps

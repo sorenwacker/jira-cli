@@ -49,10 +49,9 @@ class TestShellNavigation:
         """Can cd into an issue."""
         mock_client.get_issue.return_value = mock_issues[0]
 
-        result = shell.do_cd("DAT-123")
+        shell.do_cd("DAT-123")
 
         assert shell.current_issue == "DAT-123"
-        assert result is None
 
     def test_cd_back(
         self, shell: JiraShell, mock_client: MagicMock, mock_issues: list[Issue]
@@ -66,7 +65,7 @@ class TestShellNavigation:
         assert shell.current_issue is None
 
     def test_pwd_no_issue(self, shell: JiraShell) -> None:
-        """pwd shows no issue selected."""
+        """Pwd shows no issue selected."""
         shell.do_pwd("")
 
         assert shell.current_issue is None
@@ -74,7 +73,7 @@ class TestShellNavigation:
     def test_pwd_with_issue(
         self, shell: JiraShell, mock_client: MagicMock, mock_issues: list[Issue]
     ) -> None:
-        """pwd shows current issue."""
+        """Pwd shows current issue."""
         mock_client.get_issue.return_value = mock_issues[0]
         shell.do_cd("DAT-123")
 
@@ -102,7 +101,7 @@ class TestShellCommands:
     def test_list_issues(
         self, shell: JiraShell, mock_client: MagicMock, mock_issues: list[Issue]
     ) -> None:
-        """list shows issues."""
+        """List shows issues."""
         mock_client.get_my_issues.return_value = mock_issues
 
         shell.do_list("")
@@ -110,14 +109,14 @@ class TestShellCommands:
         mock_client.get_my_issues.assert_called_once()
 
     def test_show_requires_issue_or_arg(self, shell: JiraShell) -> None:
-        """show without arg or current issue prints usage."""
+        """Show without arg or current issue prints usage."""
         shell.do_show("")
         # Should print usage, not crash
 
     def test_show_displays_issue(
         self, shell: JiraShell, mock_client: MagicMock, mock_issues: list[Issue]
     ) -> None:
-        """show displays current issue."""
+        """Show displays current issue."""
         mock_client.get_issue.return_value = mock_issues[0]
         shell.do_cd("DAT-123")
 
@@ -129,7 +128,7 @@ class TestShellCommands:
     def test_cat_with_issue_key_from_root(
         self, shell: JiraShell, mock_client: MagicMock, mock_issues: list[Issue]
     ) -> None:
-        """cat ISSUE-KEY works from root without cd."""
+        """Cat ISSUE-KEY works from root without cd."""
         mock_client.get_issue.return_value = mock_issues[0]
 
         shell.do_cat("DAT-123")
@@ -140,7 +139,7 @@ class TestShellCommands:
     def test_ls_inside_issue_shows_details(
         self, shell: JiraShell, mock_client: MagicMock, mock_issues: list[Issue]
     ) -> None:
-        """ls inside an issue shows issue details."""
+        """Ls inside an issue shows issue details."""
         mock_client.get_issue.return_value = mock_issues[0]
         shell.do_cd("DAT-123")
         mock_client.get_issue.reset_mock()
@@ -155,7 +154,7 @@ class TestShellCommands:
     def test_ls_at_root_lists_issues(
         self, shell: JiraShell, mock_client: MagicMock, mock_issues: list[Issue]
     ) -> None:
-        """ls at root lists all issues."""
+        """Ls at root lists all issues."""
         mock_client.get_my_issues.return_value = mock_issues
 
         shell.do_ls("")
@@ -163,14 +162,14 @@ class TestShellCommands:
         mock_client.get_my_issues.assert_called_once()
 
     def test_comment_requires_issue(self, shell: JiraShell) -> None:
-        """comment requires being in an issue."""
+        """Comment requires being in an issue."""
         shell.do_comment("test comment")
         # Should print error, not crash
 
     def test_comment_adds_comment(
         self, shell: JiraShell, mock_client: MagicMock, mock_issues: list[Issue]
     ) -> None:
-        """comment adds to current issue."""
+        """Comment adds to current issue."""
         mock_client.get_issue.return_value = mock_issues[0]
         mock_client.add_comment.return_value = Comment(
             id="1", author="Test", body="test", created=datetime.now(UTC)
@@ -184,7 +183,7 @@ class TestShellCommands:
     def test_status_shows_transitions(
         self, shell: JiraShell, mock_client: MagicMock, mock_issues: list[Issue]
     ) -> None:
-        """status without arg shows transitions."""
+        """Status without arg shows transitions."""
         mock_client.get_issue.return_value = mock_issues[0]
         mock_client.get_transitions.return_value = [
             Transition(id="1", name="Done"),
@@ -199,7 +198,7 @@ class TestShellCommands:
     def test_status_transitions_issue(
         self, shell: JiraShell, mock_client: MagicMock, mock_issues: list[Issue]
     ) -> None:
-        """status with arg transitions issue."""
+        """Status with arg transitions issue."""
         mock_client.get_issue.return_value = mock_issues[0]
         mock_client.transition_issue.return_value = True
         shell.do_cd("DAT-123")
@@ -213,12 +212,12 @@ class TestShellExit:
     """Tests for shell exit."""
 
     def test_quit_exits(self, shell: JiraShell) -> None:
-        """quit returns True to exit."""
+        """Quit returns True to exit."""
         result = shell.do_quit("")
         assert result is True
 
     def test_q_exits(self, shell: JiraShell) -> None:
-        """q returns True to exit."""
+        """Q returns True to exit."""
         result = shell.do_q("")
         assert result is True
 

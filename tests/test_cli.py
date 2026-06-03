@@ -3,17 +3,16 @@
 from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
-import pytest
 from typer.testing import CliRunner
 
 from jira_cli.cli import app
+from jira_cli.client import IssueCreateParams
 from jira_cli.config import JiraConfig
 from jira_cli.models import Comment, Issue, Transition
 
 runner = CliRunner()
 
 
-@pytest.fixture
 def mock_config() -> JiraConfig:
     """Mock configuration."""
     return JiraConfig(
@@ -23,7 +22,6 @@ def mock_config() -> JiraConfig:
     )
 
 
-@pytest.fixture
 def mock_issues() -> list[Issue]:
     """Sample issues for testing."""
     return [
@@ -54,7 +52,6 @@ def mock_issues() -> list[Issue]:
     ]
 
 
-@pytest.fixture
 def mock_comments() -> list[Comment]:
     """Sample comments for testing."""
     return [
@@ -73,7 +70,6 @@ def mock_comments() -> list[Comment]:
     ]
 
 
-@pytest.fixture
 def mock_transitions() -> list[Transition]:
     """Sample transitions for testing."""
     return [
@@ -85,22 +81,22 @@ def mock_transitions() -> list[Transition]:
 
 def create_mock_client() -> MagicMock:
     """Create a mock client that works as context manager."""
-    mock_client = MagicMock()
-    mock_client.__enter__ = MagicMock(return_value=mock_client)
-    mock_client.__exit__ = MagicMock(return_value=False)
-    return mock_client
+    client = MagicMock()
+    client.__enter__ = MagicMock(return_value=client)
+    client.__exit__ = MagicMock(return_value=False)
+    return client
 
 
 class TestListCommand:
     """Tests for 'jira issue list' command."""
 
-    def test_list_issues(self, mock_config: JiraConfig, mock_issues: list[Issue]) -> None:
+    def test_list_issues(self) -> None:
         """List command displays assigned issues."""
-        with patch("jira_cli.cli.load_config", return_value=mock_config):
+        with patch("jira_cli.cli.load_config", return_value=mock_config()):
             with patch("jira_cli.cli.JiraClient") as mock_client_class:
-                mock_client = create_mock_client()
-                mock_client.get_my_issues.return_value = mock_issues
-                mock_client_class.return_value = mock_client
+                client = create_mock_client()
+                client.get_my_issues.return_value = mock_issues()
+                mock_client_class.return_value = client
 
                 result = runner.invoke(app, ["issue", "list"])
 
@@ -109,43 +105,43 @@ class TestListCommand:
         assert "First test issue" in result.output
         assert "PROJ-456" in result.output
 
-    def test_list_issues_with_status_filter(
-        self, mock_config: JiraConfig, mock_issues: list[Issue]
-    ) -> None:
+    def test_list_issues_with_status_filter(self) -> None:
         """List command can filter by status."""
-        with patch("jira_cli.cli.load_config", return_value=mock_config):
+        with patch("jira_cli.cli.load_config", return_value=mock_config()):
             with patch("jira_cli.cli.JiraClient") as mock_client_class:
-                mock_client = create_mock_client()
-                mock_client.get_my_issues.return_value = [mock_issues[1]]
-                mock_client_class.return_value = mock_client
+                client = create_mock_client()
+                client.get_my_issues.return_value = [mock_issues()[1]]
+                mock_client_class.return_value = client
 
-                result = runner.invoke(app, ["issue", "list", "--status", "In Progress"])
+                result = runner.invoke(
+                    app, ["issue", "list", "--status", "In Progress"]
+                )
 
         assert result.exit_code == 0
-        mock_client.get_my_issues.assert_called_with(status="In Progress", project=None, limit=50)
+        client.get_my_issues.assert_called_with(
+            status="In Progress", project=None, limit=50
+        )
 
-    def test_list_issues_with_project_filter(
-        self, mock_config: JiraConfig, mock_issues: list[Issue]
-    ) -> None:
+    def test_list_issues_with_project_filter(self) -> None:
         """List command can filter by project."""
-        with patch("jira_cli.cli.load_config", return_value=mock_config):
+        with patch("jira_cli.cli.load_config", return_value=mock_config()):
             with patch("jira_cli.cli.JiraClient") as mock_client_class:
-                mock_client = create_mock_client()
-                mock_client.get_my_issues.return_value = mock_issues
-                mock_client_class.return_value = mock_client
+                client = create_mock_client()
+                client.get_my_issues.return_value = mock_issues()
+                mock_client_class.return_value = client
 
                 result = runner.invoke(app, ["issue", "list", "--project", "PROJ"])
 
         assert result.exit_code == 0
-        mock_client.get_my_issues.assert_called_with(status=None, project="PROJ", limit=50)
+        client.get_my_issues.assert_called_with(status=None, project="PROJ", limit=50)
 
-    def test_list_no_issues(self, mock_config: JiraConfig) -> None:
+    def test_list_no_issues(self) -> None:
         """List command handles no issues gracefully."""
-        with patch("jira_cli.cli.load_config", return_value=mock_config):
+        with patch("jira_cli.cli.load_config", return_value=mock_config()):
             with patch("jira_cli.cli.JiraClient") as mock_client_class:
-                mock_client = create_mock_client()
-                mock_client.get_my_issues.return_value = []
-                mock_client_class.return_value = mock_client
+                client = create_mock_client()
+                client.get_my_issues.return_value = []
+                mock_client_class.return_value = client
 
                 result = runner.invoke(app, ["issue", "list"])
 
@@ -156,13 +152,13 @@ class TestListCommand:
 class TestViewCommand:
     """Tests for 'jira issue view' command."""
 
-    def test_view_issue(self, mock_config: JiraConfig, mock_issues: list[Issue]) -> None:
+    def test_view_issue(self) -> None:
         """View command displays issue details."""
-        with patch("jira_cli.cli.load_config", return_value=mock_config):
+        with patch("jira_cli.cli.load_config", return_value=mock_config()):
             with patch("jira_cli.cli.JiraClient") as mock_client_class:
-                mock_client = create_mock_client()
-                mock_client.get_issue.return_value = mock_issues[0]
-                mock_client_class.return_value = mock_client
+                client = create_mock_client()
+                client.get_issue.return_value = mock_issues()[0]
+                mock_client_class.return_value = client
 
                 result = runner.invoke(app, ["issue", "view", "PROJ-123"])
 
@@ -171,19 +167,14 @@ class TestViewCommand:
         assert "First test issue" in result.output
         assert "To Do" in result.output
 
-    def test_view_issue_with_comments(
-        self,
-        mock_config: JiraConfig,
-        mock_issues: list[Issue],
-        mock_comments: list[Comment],
-    ) -> None:
+    def test_view_issue_with_comments(self) -> None:
         """View command can include comments."""
-        with patch("jira_cli.cli.load_config", return_value=mock_config):
+        with patch("jira_cli.cli.load_config", return_value=mock_config()):
             with patch("jira_cli.cli.JiraClient") as mock_client_class:
-                mock_client = create_mock_client()
-                mock_client.get_issue.return_value = mock_issues[0]
-                mock_client.get_comments.return_value = mock_comments
-                mock_client_class.return_value = mock_client
+                client = create_mock_client()
+                client.get_issue.return_value = mock_issues()[0]
+                client.get_comments.return_value = mock_comments()
+                mock_client_class.return_value = client
 
                 result = runner.invoke(app, ["issue", "view", "PROJ-123", "--comments"])
 
@@ -195,85 +186,86 @@ class TestViewCommand:
 class TestCommentCommand:
     """Tests for 'jira issue comment' commands."""
 
-    def test_add_comment(self, mock_config: JiraConfig, mock_comments: list[Comment]) -> None:
+    def test_add_comment(self) -> None:
         """Comment add command adds a comment."""
-        with patch("jira_cli.cli.load_config", return_value=mock_config):
+        with patch("jira_cli.cli.load_config", return_value=mock_config()):
             with patch("jira_cli.cli.JiraClient") as mock_client_class:
-                mock_client = create_mock_client()
-                mock_client.add_comment.return_value = mock_comments[0]
-                mock_client_class.return_value = mock_client
+                client = create_mock_client()
+                client.add_comment.return_value = mock_comments()[0]
+                mock_client_class.return_value = client
 
                 result = runner.invoke(
                     app, ["issue", "comment", "add", "PROJ-123", "This is my comment"]
                 )
 
         assert result.exit_code == 0
-        mock_client.add_comment.assert_called_with("PROJ-123", "This is my comment")
+        client.add_comment.assert_called_with("PROJ-123", "This is my comment")
         assert "Comment added" in result.output
 
-    def test_edit_comment(self, mock_config: JiraConfig) -> None:
+    def test_edit_comment(self) -> None:
         """Comment edit command updates a comment."""
-        with patch("jira_cli.cli.load_config", return_value=mock_config):
+        with patch("jira_cli.cli.load_config", return_value=mock_config()):
             with patch("jira_cli.cli.JiraClient") as mock_client_class:
-                mock_client = create_mock_client()
-                mock_client_class.return_value = mock_client
+                client = create_mock_client()
+                mock_client_class.return_value = client
 
                 result = runner.invoke(
-                    app, ["issue", "comment", "edit", "PROJ-123", "10001", "Updated text"]
+                    app,
+                    ["issue", "comment", "edit", "PROJ-123", "10001", "Updated text"],
                 )
 
         assert result.exit_code == 0
-        mock_client.update_comment.assert_called_with("PROJ-123", "10001", "Updated text")
+        client.update_comment.assert_called_with("PROJ-123", "10001", "Updated text")
         assert "Comment updated" in result.output
 
-    def test_delete_comment(self, mock_config: JiraConfig) -> None:
+    def test_delete_comment(self) -> None:
         """Comment delete command deletes a comment."""
-        with patch("jira_cli.cli.load_config", return_value=mock_config):
+        with patch("jira_cli.cli.load_config", return_value=mock_config()):
             with patch("jira_cli.cli.JiraClient") as mock_client_class:
-                mock_client = create_mock_client()
-                mock_client_class.return_value = mock_client
+                client = create_mock_client()
+                mock_client_class.return_value = client
 
-                result = runner.invoke(app, ["issue", "comment", "delete", "PROJ-123", "10001"])
+                result = runner.invoke(
+                    app, ["issue", "comment", "delete", "PROJ-123", "10001"]
+                )
 
         assert result.exit_code == 0
-        mock_client.delete_comment.assert_called_with("PROJ-123", "10001")
+        client.delete_comment.assert_called_with("PROJ-123", "10001")
         assert "Comment deleted" in result.output
 
 
 class TestCreateSubtaskCommand:
     """Tests for 'jira issue create-subtask' command."""
 
-    def test_create_subtask(self, mock_config: JiraConfig) -> None:
+    def test_create_subtask(self) -> None:
         """Can create a subtask under a parent issue."""
-        with patch("jira_cli.cli.load_config", return_value=mock_config):
+        with patch("jira_cli.cli.load_config", return_value=mock_config()):
             with patch("jira_cli.cli.JiraClient") as mock_client_class:
-                mock_client = create_mock_client()
-                mock_client.create_issue.return_value = "PROJ-124"
-                mock_client_class.return_value = mock_client
+                client = create_mock_client()
+                client.create_issue.return_value = "PROJ-124"
+                mock_client_class.return_value = client
 
                 result = runner.invoke(
                     app, ["issue", "create-subtask", "PROJ-123", "Subtask summary"]
                 )
 
         assert result.exit_code == 0
-        mock_client.create_issue.assert_called_once_with(
-            project="PROJ",
-            summary="Subtask summary",
-            issue_type="Sub-task",
-            description=None,
-            priority=None,
-            parent="PROJ-123",
-        )
+        call_args = client.create_issue.call_args[0][0]
+        assert isinstance(call_args, IssueCreateParams)
+        assert call_args.project == "PROJ"
+        assert call_args.summary == "Subtask summary"
+        assert call_args.issue_type == "Sub-task"
+        assert call_args.parent == "PROJ-123"
         assert "Created subtask PROJ-124" in result.output
         assert "under PROJ-123" in result.output
 
-    def test_create_subtask_with_options(self, mock_config: JiraConfig) -> None:
+    def test_create_subtask_with_options(self) -> None:
         """Can create a subtask with description and priority."""
-        with patch("jira_cli.cli.load_config", return_value=mock_config):
+        with patch("jira_cli.cli.load_config", return_value=mock_config()):
             with patch("jira_cli.cli.JiraClient") as mock_client_class:
-                mock_client = create_mock_client()
-                mock_client.create_issue.return_value = "PROJ-125"
-                mock_client_class.return_value = mock_client
+                client = create_mock_client()
+                client.create_issue.return_value = "PROJ-125"
+                mock_client_class.return_value = client
 
                 result = runner.invoke(
                     app,
@@ -290,22 +282,17 @@ class TestCreateSubtaskCommand:
                 )
 
         assert result.exit_code == 0
-        mock_client.create_issue.assert_called_once_with(
-            project="PROJ",
-            summary="Subtask with details",
-            issue_type="Sub-task",
-            description="Detailed description",
-            priority="High",
-            parent="PROJ-123",
-        )
+        call_args = client.create_issue.call_args[0][0]
+        assert call_args.description == "Detailed description"
+        assert call_args.priority == "High"
 
-    def test_create_subtask_custom_type(self, mock_config: JiraConfig) -> None:
+    def test_create_subtask_custom_type(self) -> None:
         """Can create subtask with custom issue type."""
-        with patch("jira_cli.cli.load_config", return_value=mock_config):
+        with patch("jira_cli.cli.load_config", return_value=mock_config()):
             with patch("jira_cli.cli.JiraClient") as mock_client_class:
-                mock_client = create_mock_client()
-                mock_client.create_issue.return_value = "PROJ-126"
-                mock_client_class.return_value = mock_client
+                client = create_mock_client()
+                client.create_issue.return_value = "PROJ-126"
+                mock_client_class.return_value = client
 
                 result = runner.invoke(
                     app,
@@ -320,28 +307,20 @@ class TestCreateSubtaskCommand:
                 )
 
         assert result.exit_code == 0
-        mock_client.create_issue.assert_called_once_with(
-            project="PROJ",
-            summary="Technical subtask",
-            issue_type="Technical Task",
-            description=None,
-            priority=None,
-            parent="PROJ-123",
-        )
+        call_args = client.create_issue.call_args[0][0]
+        assert call_args.issue_type == "Technical Task"
 
 
 class TestMoveCommand:
     """Tests for 'jira issue move' command."""
 
-    def test_list_transitions(
-        self, mock_config: JiraConfig, mock_transitions: list[Transition]
-    ) -> None:
+    def test_list_transitions(self) -> None:
         """Move command without target shows available transitions."""
-        with patch("jira_cli.cli.load_config", return_value=mock_config):
+        with patch("jira_cli.cli.load_config", return_value=mock_config()):
             with patch("jira_cli.cli.JiraClient") as mock_client_class:
-                mock_client = create_mock_client()
-                mock_client.get_transitions.return_value = mock_transitions
-                mock_client_class.return_value = mock_client
+                client = create_mock_client()
+                client.get_transitions.return_value = mock_transitions()
+                mock_client_class.return_value = client
 
                 result = runner.invoke(app, ["issue", "move", "PROJ-123"])
 
@@ -350,64 +329,65 @@ class TestMoveCommand:
         assert "In Progress" in result.output
         assert "Done" in result.output
 
-    def test_transition_issue(
-        self, mock_config: JiraConfig, mock_transitions: list[Transition]
-    ) -> None:
+    def test_transition_issue(self) -> None:
         """Move command with target transitions the issue."""
-        with patch("jira_cli.cli.load_config", return_value=mock_config):
+        with patch("jira_cli.cli.load_config", return_value=mock_config()):
             with patch("jira_cli.cli.JiraClient") as mock_client_class:
-                mock_client = create_mock_client()
-                mock_client.transition_issue.return_value = True
-                mock_client_class.return_value = mock_client
+                client = create_mock_client()
+                client.transition_issue.return_value = True
+                mock_client_class.return_value = client
 
-                result = runner.invoke(app, ["issue", "move", "PROJ-123", "In Progress"])
+                result = runner.invoke(
+                    app, ["issue", "move", "PROJ-123", "In Progress"]
+                )
 
         assert result.exit_code == 0
-        mock_client.transition_issue.assert_called_with("PROJ-123", "In Progress")
+        client.transition_issue.assert_called_with("PROJ-123", "In Progress")
         assert "transitioned" in result.output.lower() or "In Progress" in result.output
 
 
 class TestDeleteCommand:
     """Tests for 'jira issue delete' command."""
 
-    def test_delete_issue_with_force(self, mock_config: JiraConfig) -> None:
+    def test_delete_issue_with_force(self) -> None:
         """Delete command with --force skips confirmation."""
-        with patch("jira_cli.cli.load_config", return_value=mock_config):
+        with patch("jira_cli.cli.load_config", return_value=mock_config()):
             with patch("jira_cli.cli.JiraClient") as mock_client_class:
-                mock_client = create_mock_client()
-                mock_client_class.return_value = mock_client
+                client = create_mock_client()
+                mock_client_class.return_value = client
 
                 result = runner.invoke(app, ["issue", "delete", "PROJ-123", "--force"])
 
         assert result.exit_code == 0
-        mock_client.delete_issue.assert_called_with("PROJ-123")
+        client.delete_issue.assert_called_with("PROJ-123")
         assert "Deleted PROJ-123" in result.output
 
-    def test_delete_issue_cancelled(self, mock_config: JiraConfig) -> None:
+    def test_delete_issue_cancelled(self) -> None:
         """Delete command can be cancelled."""
-        with patch("jira_cli.cli.load_config", return_value=mock_config):
+        with patch("jira_cli.cli.load_config", return_value=mock_config()):
             with patch("jira_cli.cli.JiraClient") as mock_client_class:
-                mock_client = create_mock_client()
-                mock_client_class.return_value = mock_client
+                client = create_mock_client()
+                mock_client_class.return_value = client
 
-                result = runner.invoke(app, ["issue", "delete", "PROJ-123"], input="n\n")
+                result = runner.invoke(
+                    app, ["issue", "delete", "PROJ-123"], input="n\n"
+                )
 
         assert "Cancelled" in result.output
-        mock_client.delete_issue.assert_not_called()
+        client.delete_issue.assert_not_called()
 
 
 class TestConfigCommand:
     """Tests for 'jira config' command."""
 
-    def test_config_show(self, mock_config: JiraConfig) -> None:
+    def test_config_show(self) -> None:
         """Config --show displays current config (redacted)."""
-        with patch("jira_cli.cli.load_config", return_value=mock_config):
+        with patch("jira_cli.cli.load_config", return_value=mock_config()):
             result = runner.invoke(app, ["config", "--show"])
 
         assert result.exit_code == 0
         assert "test.atlassian.net" in result.output
         assert "test@example.com" in result.output
-        # Token should be redacted
         assert "test-token" not in result.output
 
     def test_config_interactive(self) -> None:

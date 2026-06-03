@@ -11,6 +11,18 @@ def _parse_jira_datetime(value: str) -> datetime:
     return datetime.fromisoformat(value.replace("+0000", "+00:00"))
 
 
+def _get_display_name(fields: dict[str, Any], field_name: str) -> str | None:
+    """Extract display name from a nested field."""
+    field_data = fields.get(field_name)
+    return field_data.get("displayName") if field_data else None
+
+
+def _get_nested_name(fields: dict[str, Any], field_name: str) -> str | None:
+    """Extract 'name' from a nested field."""
+    field_data = fields.get(field_name)
+    return field_data.get("name") if field_data else None
+
+
 class Attachment(BaseModel):
     """Represents a Jira attachment."""
 
@@ -50,45 +62,28 @@ class Issue(BaseModel):
     updated: datetime
     description: str | None
     attachments: list[Attachment] = []
+    labels: list[str] = []
 
     @classmethod
     def from_api_response(cls, data: dict[str, Any]) -> "Issue":
         """Create an Issue from Jira API response."""
         fields = data["fields"]
-
-        # Extract assignee display name
-        assignee = None
-        if fields.get("assignee"):
-            assignee = fields["assignee"].get("displayName")
-
-        # Extract reporter display name
-        reporter = None
-        if fields.get("reporter"):
-            reporter = fields["reporter"].get("displayName")
-
-        # Extract priority name
-        priority = None
-        if fields.get("priority"):
-            priority = fields["priority"].get("name")
-
-        # Extract description text from ADF format
-        description = _extract_text_from_adf(fields.get("description"))
-
-        # Extract attachments
-        attachments = [Attachment.from_api_response(a) for a in fields.get("attachment", [])]
+        raw_attachments = fields.get("attachment", [])
+        attachments = [Attachment.from_api_response(a) for a in raw_attachments]
 
         return cls(
             key=data["key"],
             summary=fields["summary"],
             status=fields["status"]["name"],
-            assignee=assignee,
-            reporter=reporter,
+            assignee=_get_display_name(fields, "assignee"),
+            reporter=_get_display_name(fields, "reporter"),
             project=fields["project"]["key"],
-            priority=priority,
+            priority=_get_nested_name(fields, "priority"),
             created=_parse_jira_datetime(fields["created"]),
             updated=_parse_jira_datetime(fields["updated"]),
-            description=description,
+            description=_extract_text_from_adf(fields.get("description")),
             attachments=attachments,
+            labels=fields.get("labels", []),
         )
 
 
@@ -172,17 +167,18 @@ class User(BaseModel):
         )
 
 
+def _extract_adf_node_text(node: dict[str, Any]) -> str:
+    """Recursively extract text from a single ADF node."""
+    if node.get("type") == "text":
+        text = node.get("text", "")
+        return str(text) if text else ""
+    content: list[dict[str, Any]] = node.get("content", [])
+    return "".join(_extract_adf_node_text(child) for child in content)
+
+
 def _extract_text_from_adf(adf: dict[str, Any] | None) -> str | None:
     """Extract plain text from Atlassian Document Format (ADF)."""
     if adf is None:
         return None
-
-    def extract_content(node: dict[str, Any]) -> str:
-        """Recursively extract text from ADF nodes."""
-        if node.get("type") == "text":
-            return node.get("text", "")
-
-        content = node.get("content", [])
-        return "".join(extract_content(child) for child in content)
-
-    return extract_content(adf) or None
+    text = _extract_adf_node_text(adf)
+    return text or None

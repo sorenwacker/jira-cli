@@ -1,14 +1,24 @@
 """CLI commands for Jira CLI."""
 
+from typing import TYPE_CHECKING
+
 import typer
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
-from jira_cli.client import JiraClient
+from jira_cli.client import (
+    IssueCreateParams,
+    IssueUpdateParams,
+    JiraClient,
+    UserSearchParams,
+)
 from jira_cli.config import JiraConfig, load_config, save_config
 from jira_cli.shell import JiraShell
+
+if TYPE_CHECKING:
+    from jira_cli.models import Comment, Issue
 
 app = typer.Typer(
     name="jira",
@@ -55,7 +65,7 @@ def _parse_labels(labels: str | None) -> list[str] | None:
     return [label.strip() for label in labels.split(",")]
 
 
-def _create_issue_table(issues: list, title: str) -> Table:
+def _create_issue_table(issues: list["Issue"], title: str) -> Table:
     """Create a Rich table for displaying issues."""
     table = Table(title=title)
     table.add_column("Key", style="cyan", no_wrap=True)
@@ -64,14 +74,15 @@ def _create_issue_table(issues: list, title: str) -> Table:
     table.add_column("Summary")
 
     for issue in issues:
-        table.add_row(
-            issue.key,
-            issue.status,
-            issue.priority or "-",
-            issue.summary[:60] + "..." if len(issue.summary) > 60 else issue.summary,
-        )
+        summary = _truncate(issue.summary, max_len=60)
+        table.add_row(issue.key, issue.status, issue.priority or "-", summary)
 
     return table
+
+
+def _truncate(text: str, *, max_len: int) -> str:
+    """Truncate text with ellipsis if too long."""
+    return text[:max_len] + "..." if len(text) > max_len else text
 
 
 def get_client() -> JiraClient:
@@ -82,8 +93,8 @@ def get_client() -> JiraClient:
 @issue_app.command("list")
 def issue_list(
     status: str | None = typer.Option(None, "--status", "-s", help="Filter by status"),
-    project: str | None = typer.Option(None, "--project", "-p", help="Filter by project key"),
-    limit: int = typer.Option(50, "--limit", "-l", help="Maximum number of results"),
+    project: str | None = typer.Option(None, "--project", "-p", help="Project key"),
+    limit: int = typer.Option(50, "--limit", "-l", help="Max results"),
 ) -> None:
     """List issues assigned to you."""
     with get_client() as client:
@@ -106,40 +117,47 @@ def issue_view(
         issue = client.get_issue(issue_key)
         issue_comments = client.get_comments(issue_key) if comments else []
 
-    content = Text()
-    content.append("Summary: ", style="bold")
-    content.append(f"{issue.summary}\n")
-    content.append("Status: ", style="bold")
-    content.append(f"{issue.status}\n")
-    content.append("Priority: ", style="bold")
-    content.append(f"{issue.priority or '-'}\n")
-    content.append("Assignee: ", style="bold")
-    content.append(f"{issue.assignee or 'Unassigned'}\n")
-    content.append("Reporter: ", style="bold")
-    content.append(f"{issue.reporter or 'Unknown'}\n")
-    content.append("Project: ", style="bold")
-    content.append(f"{issue.project}\n")
-    content.append("Created: ", style="bold")
-    content.append(f"{issue.created.strftime('%Y-%m-%d %H:%M')}\n")
-    content.append("Updated: ", style="bold")
-    content.append(f"{issue.updated.strftime('%Y-%m-%d %H:%M')}\n")
+    content = _build_issue_view_content(issue)
+    console.print(Panel(content, title=f"[cyan]{issue.key}[/cyan]"))
+    _print_comments(issue_comments, comments)
 
+
+def _build_issue_view_content(issue: "Issue") -> Text:
+    """Build Rich Text content for issue view."""
+    content = Text()
+    fields = [
+        ("Summary", issue.summary),
+        ("Status", issue.status),
+        ("Priority", issue.priority or "-"),
+        ("Assignee", issue.assignee or "Unassigned"),
+        ("Reporter", issue.reporter or "Unknown"),
+        ("Project", issue.project),
+        ("Created", issue.created.strftime("%Y-%m-%d %H:%M")),
+        ("Updated", issue.updated.strftime("%Y-%m-%d %H:%M")),
+    ]
+    for label, value in fields:
+        content.append(f"{label}: ", style="bold")
+        content.append(f"{value}\n")
     if issue.description:
         content.append("\nDescription:\n", style="bold")
         content.append(issue.description)
+    return content
 
-    console.print(Panel(content, title=f"[cyan]{issue.key}[/cyan]"))
 
-    if comments and issue_comments:
+def _print_comments(comments: list["Comment"], show: bool) -> None:
+    """Print comments if requested."""
+    if not show:
+        return
+    if comments:
         console.print("\n[bold]Comments:[/bold]")
-        for c in issue_comments:
-            comment_text = Text()
-            comment_text.append(f"{c.author}", style="cyan")
-            comment_text.append(f" - {c.created.strftime('%Y-%m-%d %H:%M')}", style="dim")
-            comment_text.append(f" [id: {c.id}]\n", style="dim")
-            comment_text.append(c.body)
-            console.print(Panel(comment_text))
-    elif comments:
+        for c in comments:
+            text = Text()
+            text.append(f"{c.author}", style="cyan")
+            text.append(f" - {c.created.strftime('%Y-%m-%d %H:%M')}", style="dim")
+            text.append(f" [id: {c.id}]\n", style="dim")
+            text.append(c.body)
+            console.print(Panel(text))
+    else:
         console.print("\n[dim]No comments[/dim]")
 
 
@@ -203,22 +221,30 @@ def config(
 ) -> None:
     """Configure Jira credentials."""
     if show:
-        try:
-            cfg = load_config()
-            console.print(f"[bold]URL:[/bold] {cfg.url}")
-            console.print(f"[bold]Email:[/bold] {cfg.email}")
-            console.print(f"[bold]API Token:[/bold] {'*' * 20}")
-        except ValueError as e:
-            console.print(f"[red]Not configured: {e}[/red]")
+        _show_config()
         return
+    _prompt_and_save_config()
 
+
+def _show_config() -> None:
+    """Show current configuration."""
+    try:
+        cfg = load_config()
+        console.print(f"[bold]URL:[/bold] {cfg.url}")
+        console.print(f"[bold]Email:[/bold] {cfg.email}")
+        console.print(f"[bold]API Token:[/bold] {'*' * 20}")
+    except ValueError as e:
+        console.print(f"[red]Not configured: {e}[/red]")
+
+
+def _prompt_and_save_config() -> None:
+    """Prompt for and save configuration."""
     url = typer.prompt("Jira URL (e.g., https://yourcompany.atlassian.net)")
     email = typer.prompt("Email")
     api_token = typer.prompt("API Token", hide_input=True)
 
     cfg = JiraConfig(url=url, email=email, api_token=api_token)
     save_config(cfg)
-
     console.print("[green]Configuration saved[/green]")
 
 
@@ -226,25 +252,22 @@ def config(
 def issue_create(
     project: str = typer.Argument(..., help="Project key (e.g., PROJ)"),
     summary: str = typer.Argument(..., help="Issue summary/title"),
-    issue_type: str = typer.Option(
-        "Task", "--type", "-t", help="Issue type (Task, Bug, Story, etc.)"
-    ),
-    description: str | None = typer.Option(None, "--description", "-d", help="Issue description"),
-    priority: str | None = typer.Option(
-        None, "--priority", "-p", help="Priority (e.g., High, Medium, Low)"
-    ),
-    labels: str | None = typer.Option(None, "--labels", "-l", help="Comma-separated labels"),
+    issue_type: str = typer.Option("Task", "--type", "-t", help="Issue type"),
+    description: str | None = typer.Option(None, "--description", "-d"),
+    priority: str | None = typer.Option(None, "--priority", "-p"),
+    labels: str | None = typer.Option(None, "--labels", "-l", help="CSV labels"),
 ) -> None:
     """Create a new issue."""
+    params = IssueCreateParams(
+        project=project,
+        summary=summary,
+        issue_type=issue_type,
+        description=description,
+        priority=priority,
+        labels=_parse_labels(labels),
+    )
     with get_client() as client:
-        issue_key = client.create_issue(
-            project=project,
-            summary=summary,
-            issue_type=issue_type,
-            description=description,
-            priority=priority,
-            labels=_parse_labels(labels),
-        )
+        issue_key = client.create_issue(params)
 
     console.print(f"[green]Created {issue_key}[/green]")
 
@@ -253,27 +276,22 @@ def issue_create(
 def issue_create_subtask(
     parent_key: str = typer.Argument(..., help="Parent issue key (e.g., PROJ-123)"),
     summary: str = typer.Argument(..., help="Subtask summary"),
-    issue_type: str = typer.Option(
-        "Sub-task", "--type", "-t", help="Issue type (defaults to Sub-task)"
-    ),
-    description: str | None = typer.Option(None, "--description", "-d", help="Subtask description"),
-    priority: str | None = typer.Option(
-        None, "--priority", "-p", help="Priority (e.g., High, Medium, Low)"
-    ),
+    issue_type: str = typer.Option("Sub-task", "--type", "-t", help="Issue type"),
+    description: str | None = typer.Option(None, "--description", "-d"),
+    priority: str | None = typer.Option(None, "--priority", "-p"),
 ) -> None:
     """Create a subtask under a parent issue."""
-    # Extract project key from parent issue key
-    project = parent_key.split("-")[0]
-
+    project = parent_key.split("-", maxsplit=1)[0]
+    params = IssueCreateParams(
+        project=project,
+        summary=summary,
+        issue_type=issue_type,
+        description=description,
+        priority=priority,
+        parent=parent_key,
+    )
     with get_client() as client:
-        issue_key = client.create_issue(
-            project=project,
-            summary=summary,
-            issue_type=issue_type,
-            description=description,
-            priority=priority,
-            parent=parent_key,
-        )
+        issue_key = client.create_issue(params)
 
     console.print(f"[green]Created subtask {issue_key} under {parent_key}[/green]")
 
@@ -281,22 +299,22 @@ def issue_create_subtask(
 @issue_app.command("edit")
 def issue_edit(
     issue_key: str = typer.Argument(..., help="Issue key (e.g., PROJ-123)"),
-    summary: str | None = typer.Option(None, "--summary", "-s", help="New summary"),
-    description: str | None = typer.Option(None, "--description", "-d", help="New description"),
-    priority: str | None = typer.Option(None, "--priority", "-p", help="New priority"),
-    labels: str | None = typer.Option(None, "--labels", "-l", help="New labels (comma-separated)"),
-    assignee: str | None = typer.Option(None, "--assignee", "-a", help="New assignee (account ID)"),
+    summary: str | None = typer.Option(None, "--summary", "-s"),
+    description: str | None = typer.Option(None, "--description", "-d"),
+    priority: str | None = typer.Option(None, "--priority", "-p"),
+    labels: str | None = typer.Option(None, "--labels", "-l"),
+    assignee: str | None = typer.Option(None, "--assignee", "-a"),
 ) -> None:
     """Edit issue fields."""
+    params = IssueUpdateParams(
+        summary=summary,
+        description=description,
+        priority=priority,
+        labels=_parse_labels(labels),
+        assignee=assignee,
+    )
     with get_client() as client:
-        client.update_issue(
-            issue_key,
-            summary=summary,
-            description=description,
-            priority=priority,
-            labels=_parse_labels(labels),
-            assignee=assignee,
-        )
+        client.update_issue(issue_key, params)
 
     console.print(f"[green]Updated {issue_key}[/green]")
 
@@ -349,7 +367,7 @@ def issue_delete(
         confirm = typer.confirm(f"Delete {issue_key}? This cannot be undone")
         if not confirm:
             console.print("[yellow]Cancelled[/yellow]")
-            raise typer.Exit()
+            raise typer.Exit()  # noqa: RSE102 - typer.Exit requires instantiation
 
     with get_client() as client:
         client.delete_issue(issue_key)
@@ -367,15 +385,14 @@ def shell() -> None:
 
 @user_app.command("list")
 def user_list(
-    project: str = typer.Option(
-        ..., "--project", "-p", help="Project key to list assignable users"
-    ),
-    query: str | None = typer.Option(None, "--query", "-q", help="Search by name or email"),
-    limit: int = typer.Option(1000, "--limit", "-l", help="Maximum number of results"),
+    project: str = typer.Option(..., "--project", "-p", help="Project key"),
+    query: str | None = typer.Option(None, "--query", "-q", help="Search by name"),
+    limit: int = typer.Option(1000, "--limit", "-l", help="Maximum results"),
 ) -> None:
     """List users assignable to a project."""
+    params = UserSearchParams(query=query, project=project, limit=limit)
     with get_client() as client:
-        users = client.get_users(query=query, project=project, limit=limit)
+        users = client.get_users(params)
 
     if not users:
         console.print("[yellow]No users found[/yellow]")
@@ -387,11 +404,7 @@ def user_list(
     table.add_column("Account ID", style="dim")
 
     for user in users:
-        table.add_row(
-            user.display_name,
-            user.email or "-",
-            user.account_id,
-        )
+        table.add_row(user.display_name, user.email or "-", user.account_id)
 
     console.print(table)
 
@@ -412,11 +425,7 @@ def project_list() -> None:
     table.add_column("Type", style="dim")
 
     for project in projects:
-        table.add_row(
-            project.key,
-            project.name,
-            project.project_type,
-        )
+        table.add_row(project.key, project.name, project.project_type)
 
     console.print(table)
 

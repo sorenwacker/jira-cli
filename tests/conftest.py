@@ -55,8 +55,14 @@ def sample_issue_response(sample_attachment_response: list[dict]) -> dict:
         "fields": {
             "summary": "Test issue summary",
             "status": {"name": "To Do"},
-            "assignee": {"displayName": "Test User", "emailAddress": "test@example.com"},
-            "reporter": {"displayName": "Reporter User", "emailAddress": "reporter@example.com"},
+            "assignee": {
+                "displayName": "Test User",
+                "emailAddress": "test@example.com",
+            },
+            "reporter": {
+                "displayName": "Reporter User",
+                "emailAddress": "reporter@example.com",
+            },
             "project": {"key": "PROJ", "name": "Test Project"},
             "priority": {"name": "Medium"},
             "created": "2024-01-15T10:30:00.000+0000",
@@ -71,6 +77,7 @@ def sample_issue_response(sample_attachment_response: list[dict]) -> dict:
                 ],
             },
             "attachment": sample_attachment_response,
+            "labels": ["bug", "high-priority"],
         },
     }
 
@@ -155,46 +162,53 @@ def sample_projects_response() -> list[dict]:
     ]
 
 
+def _user_john() -> dict:
+    """Test user: John Doe with email."""
+    return {
+        "accountId": "abc123",
+        "displayName": "John Doe",
+        "emailAddress": "john@example.com",
+        "active": True,
+        "accountType": "atlassian",
+        "avatarUrls": {"48x48": "https://avatar.example.com/john.png"},
+    }
+
+
+def _user_jane() -> dict:
+    """Test user: Jane Smith with email."""
+    return {
+        "accountId": "def456",
+        "displayName": "Jane Smith",
+        "emailAddress": "jane@example.com",
+        "active": True,
+        "accountType": "atlassian",
+        "avatarUrls": {"48x48": "https://avatar.example.com/jane.png"},
+    }
+
+
+def _user_no_email() -> dict:
+    """Test user: No email."""
+    return {
+        "accountId": "ghi789",
+        "displayName": "No Email User",
+        "active": True,
+        "accountType": "atlassian",
+        "avatarUrls": {"48x48": "https://avatar.example.com/noemail.png"},
+    }
+
+
+def _user_bot() -> dict:
+    """Test user: Automation bot (app type)."""
+    return {
+        "accountId": "app789",
+        "displayName": "Automation Bot",
+        "active": True,
+        "accountType": "app",
+        "avatarUrls": {"48x48": "https://avatar.example.com/bot.png"},
+    }
+
+
 @pytest.fixture
 def sample_users_response() -> list[dict]:
     """Sample Jira API response for user search."""
-    return [
-        {
-            "accountId": "abc123",
-            "displayName": "John Doe",
-            "emailAddress": "john@example.com",
-            "active": True,
-            "accountType": "atlassian",
-            "avatarUrls": {
-                "48x48": "https://avatar.example.com/john.png",
-            },
-        },
-        {
-            "accountId": "def456",
-            "displayName": "Jane Smith",
-            "emailAddress": "jane@example.com",
-            "active": True,
-            "accountType": "atlassian",
-            "avatarUrls": {
-                "48x48": "https://avatar.example.com/jane.png",
-            },
-        },
-        {
-            "accountId": "ghi789",
-            "displayName": "No Email User",
-            "active": True,
-            "accountType": "atlassian",
-            "avatarUrls": {
-                "48x48": "https://avatar.example.com/noemail.png",
-            },
-        },
-        {
-            "accountId": "app789",
-            "displayName": "Automation Bot",
-            "active": True,
-            "accountType": "app",
-            "avatarUrls": {
-                "48x48": "https://avatar.example.com/bot.png",
-            },
-        },
-    ]
+    return [_user_john(), _user_jane(), _user_no_email(), _user_bot()]

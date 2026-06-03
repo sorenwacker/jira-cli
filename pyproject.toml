@@ -3,7 +3,7 @@ name = "jira-cli"
 version = "0.1.0"
 description = "CLI tool for managing Jira Cloud issues"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.12,<3.14"
 dependencies = [
     "typer>=0.9.0",
     "httpx>=0.27.0",
@@ -16,10 +16,14 @@ dependencies = [
 dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.23.0",
-    "pytest-cov>=4.0.0",
+    "pytest-cov>=5.0.0",
     "respx>=0.21.0",
-    "pre-commit>=3.0.0",
-    "ruff>=0.4.0",
+    "pre-commit>=4.0.0",
+    "ruff>=0.15.0",
+    "mypy>=2.0.0",
+    "pylint>=4.0.5",
+    "flake8==7.3.0",
+    "flake8-functions==0.0.8",
     "vulture>=2.11",
 ]
 
@@ -37,24 +41,126 @@ packages = ["src/jira_cli"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+addopts = ["-ra", "--showlocals", "--strict-markers", "--strict-config"]
+markers = [
+    "slow: marks tests that take more than a few seconds (use -m 'not slow' to skip)",
+]
+xfail_strict = true
+filterwarnings = ["error"]
 
 [tool.ruff]
-target-version = "py311"
-line-length = 100
+target-version = "py312"
+line-length = 88
 src = ["src", "tests"]
 
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+docstring-code-format = true
+
 [tool.ruff.lint]
-select = [
-    "E",      # pycodestyle errors
-    "W",      # pycodestyle warnings
-    "F",      # pyflakes
-    "I",      # isort
-    "B",      # flake8-bugbear
-    "C4",     # flake8-comprehensions
-    "UP",     # pyupgrade
-]
+select = ["ALL"]
 ignore = [
-    "E501",   # line too long (handled by formatter)
+    "COM812",  # Conflicts with formatter
+    "ISC001",  # Conflicts with formatter
+    "CPY001",  # No copyright header required
+]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 7
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.pylint]
+max-args = 5
+max-bool-expr = 3
+max-branches = 12
+max-locals = 15
+max-returns = 4
+max-statements = 20
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = [
+    "S101",  # assert is fine in tests
+    "D100", "D101", "D102", "D103", "D104", "D107",  # docstrings optional in tests
+    "ANN",  # annotations optional in tests
+    "FBT",  # booleans fine in tests
+    "PLR2004",  # magic values fine in tests
+    "S105", "S106",  # hardcoded passwords are test data
+    "SIM117",  # nested with is more readable in tests
+    "PLC0415",  # imports in tests for isolation
+]
+# CLI uses typer patterns - function args are CLI params, not code smell
+"src/jira_cli/cli.py" = ["FBT001", "FBT002", "FBT003", "PLR2004", "PLR0913"]
+# Shell uses cmd patterns - complexity unavoidable, do_EOF is a cmd.Cmd convention
+"src/jira_cli/shell.py" = [
+    "FBT001", "FBT002", "FBT003", "PLR2004", "C901", "PLR0915",
+    "N802",  # do_EOF is cmd.Cmd convention
+    "S110",  # except-pass is intentional for shell robustness
+    "PLC0415",  # local imports avoid circular deps
+]
+# MCP tools use fastmcp patterns - function args are tool params
+"src/jira_cli/mcp.py" = ["FBT001", "FBT002", "FBT003", "PLR0913"]
+# Client has param dataclasses with many init args by design
+"src/jira_cli/client.py" = ["PLR0913", "FBT001", "FBT002"]
+
+[tool.pylint.main]
+load-plugins = []
+jobs = 1
+
+[tool.pylint.format]
+max-line-length = 88
+max-module-lines = 666
+
+[tool.pylint.design]
+max-parents = 7
+max-attributes = 7
+
+[tool.pylint.similarities]
+min-similarity-lines = 20
+
+[tool.pylint."messages control"]
+disable = "all"
+enable = [
+    "R0801",  # Duplicate code
+    "R0901",  # Too many ancestors
+    "R0902",  # Too many instance attributes
+    "R0904",  # Too many public methods
+    "C0302",  # Too many lines in module
+]
+
+# Per-file ignores for pylint
+# Note: pylint doesn't support per-file ignores in pyproject.toml well,
+# so we need inline comments or .pylintrc. Using inline for now.
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unused_configs = true
+warn_unreachable = true
+show_error_codes = true
+mypy_path = "src"
+files = ["src", "tests"]
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false
+disable_error_code = ["type-arg"]
+
+[tool.coverage.run]
+source = ["src"]
+branch = true
+
+[tool.coverage.report]
+fail_under = 80
+exclude_also = [
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    'if __name__ == "__main__":',
+    "@(abc\\.)?abstractmethod",
+    "def __repr__",
+    "class .*\\bProtocol\\):",
 ]
 
 [tool.vulture]

@@ -102,13 +102,18 @@ class TestLinks:
         result = markdown_to_adf("Click [here](https://example.com) for info")
         content = result["content"][0]["content"]
         assert content[1]["text"] == "here"
-        assert content[1]["marks"] == [{"type": "link", "attrs": {"href": "https://example.com"}}]
+        assert content[1]["marks"] == [
+            {"type": "link", "attrs": {"href": "https://example.com"}}
+        ]
 
     def test_link_with_special_chars(self) -> None:
         """Links with query params work."""
         result = markdown_to_adf("[link](https://example.com/path?a=1&b=2)")
         content = result["content"][0]["content"]
-        assert content[0]["marks"][0]["attrs"]["href"] == "https://example.com/path?a=1&b=2"
+        assert (
+            content[0]["marks"][0]["attrs"]["href"]
+            == "https://example.com/path?a=1&b=2"
+        )
 
 
 class TestHeadings:
@@ -193,7 +198,9 @@ class TestLists:
         result = markdown_to_adf("- Item with **bold**")
         item_content = result["content"][0]["content"][0]["content"][0]["content"]
         assert any(
-            node.get("marks") == [{"type": "strong"}] for node in item_content if "marks" in node
+            node.get("marks") == [{"type": "strong"}]
+            for node in item_content
+            if "marks" in node
         )
 
 

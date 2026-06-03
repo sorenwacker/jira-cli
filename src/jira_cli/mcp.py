@@ -1,16 +1,25 @@
 """MCP server exposing Jira operations as tools."""
 
+from typing import Any
+
 from fastmcp import FastMCP
 
-from jira_cli.client import JiraClient
+from jira_cli.client import (
+    IssueCreateParams,
+    IssueUpdateParams,
+    JiraClient,
+    UserSearchParams,
+)
 from jira_cli.config import load_config
+from jira_cli.models import Issue
+from jira_cli.quality import generate_quality_report
 
 mcp = FastMCP("Jira")
 
 
-def _issue_to_dict(issue, full: bool = False) -> dict:
+def _issue_to_dict(issue: Issue, *, full: bool = False) -> dict[str, Any]:
     """Convert Issue to dictionary for MCP response."""
-    result = {
+    result: dict[str, Any] = {
         "key": issue.key,
         "summary": issue.summary,
         "status": issue.status,
@@ -36,7 +45,7 @@ def get_client() -> JiraClient:
 
 
 @mcp.tool()
-def get_issue(issue_key: str) -> dict:
+def get_issue(issue_key: str) -> dict[str, Any]:
     """Get issue details by key.
 
     Args:
@@ -51,7 +60,7 @@ def get_issue(issue_key: str) -> dict:
 
 
 @mcp.tool()
-def search_issues(jql: str, limit: int = 50) -> list[dict]:
+def search_issues(jql: str, limit: int = 50) -> list[dict[str, Any]]:
     """Search issues using JQL.
 
     Args:
@@ -71,7 +80,7 @@ def get_my_issues(
     status: str | None = None,
     project: str | None = None,
     limit: int = 50,
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """Get issues assigned to current user.
 
     Args:
@@ -96,7 +105,7 @@ def create_issue(
     priority: str | None = None,
     labels: list[str] | None = None,
     parent: str | None = None,
-) -> dict:
+) -> dict[str, str]:
     """Create a new issue or subtask.
 
     Args:
@@ -111,16 +120,17 @@ def create_issue(
     Returns:
         Created issue key.
     """
+    params = IssueCreateParams(
+        project=project,
+        summary=summary,
+        issue_type=issue_type,
+        description=description,
+        priority=priority,
+        labels=labels,
+        parent=parent,
+    )
     with get_client() as client:
-        issue_key = client.create_issue(
-            project=project,
-            summary=summary,
-            issue_type=issue_type,
-            description=description,
-            priority=priority,
-            labels=labels,
-            parent=parent,
-        )
+        issue_key = client.create_issue(params)
         return {"key": issue_key}
 
 
@@ -132,7 +142,7 @@ def update_issue(
     priority: str | None = None,
     labels: list[str] | None = None,
     assignee: str | None = None,
-) -> dict:
+) -> dict[str, Any]:
     """Update an issue's fields.
 
     Args:
@@ -146,20 +156,20 @@ def update_issue(
     Returns:
         Success status.
     """
+    params = IssueUpdateParams(
+        summary=summary,
+        description=description,
+        priority=priority,
+        labels=labels,
+        assignee=assignee,
+    )
     with get_client() as client:
-        client.update_issue(
-            issue_key,
-            summary=summary,
-            description=description,
-            priority=priority,
-            labels=labels,
-            assignee=assignee,
-        )
+        client.update_issue(issue_key, params)
         return {"success": True, "issue_key": issue_key}
 
 
 @mcp.tool()
-def get_transitions(issue_key: str) -> list[dict]:
+def get_transitions(issue_key: str) -> list[dict[str, str]]:
     """Get available status transitions for an issue.
 
     Args:
@@ -174,7 +184,7 @@ def get_transitions(issue_key: str) -> list[dict]:
 
 
 @mcp.tool()
-def transition_issue(issue_key: str, transition_name: str) -> dict:
+def transition_issue(issue_key: str, transition_name: str) -> dict[str, Any]:
     """Change an issue's status.
 
     Args:
@@ -190,7 +200,7 @@ def transition_issue(issue_key: str, transition_name: str) -> dict:
 
 
 @mcp.tool()
-def get_comments(issue_key: str) -> list[dict]:
+def get_comments(issue_key: str) -> list[dict[str, Any]]:
     """Get comments for an issue.
 
     Args:
@@ -213,7 +223,7 @@ def get_comments(issue_key: str) -> list[dict]:
 
 
 @mcp.tool()
-def add_comment(issue_key: str, body: str) -> dict:
+def add_comment(issue_key: str, body: str) -> dict[str, Any]:
     """Add a comment to an issue.
 
     Args:
@@ -234,7 +244,7 @@ def add_comment(issue_key: str, body: str) -> dict:
 
 
 @mcp.tool()
-def get_projects() -> list[dict]:
+def get_projects() -> list[dict[str, str]]:
     """Get all projects visible to the current user.
 
     Returns:
@@ -243,11 +253,7 @@ def get_projects() -> list[dict]:
     with get_client() as client:
         projects = client.get_projects()
         return [
-            {
-                "key": p.key,
-                "name": p.name,
-                "project_type": p.project_type,
-            }
+            {"key": p.key, "name": p.name, "project_type": p.project_type}
             for p in projects
         ]
 
@@ -257,7 +263,7 @@ def get_users(
     query: str | None = None,
     project: str | None = None,
     limit: int = 50,
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """Search for users.
 
     Args:
@@ -268,8 +274,9 @@ def get_users(
     Returns:
         List of users.
     """
+    params = UserSearchParams(query=query, project=project, limit=limit)
     with get_client() as client:
-        users = client.get_users(query=query, project=project, limit=limit)
+        users = client.get_users(params)
         return [
             {
                 "account_id": u.account_id,
@@ -282,7 +289,7 @@ def get_users(
 
 
 @mcp.tool()
-def watch_issue(issue_key: str) -> dict:
+def watch_issue(issue_key: str) -> dict[str, Any]:
     """Start watching an issue.
 
     Args:
@@ -297,7 +304,7 @@ def watch_issue(issue_key: str) -> dict:
 
 
 @mcp.tool()
-def unwatch_issue(issue_key: str) -> dict:
+def unwatch_issue(issue_key: str) -> dict[str, Any]:
     """Stop watching an issue.
 
     Args:
@@ -312,7 +319,7 @@ def unwatch_issue(issue_key: str) -> dict:
 
 
 @mcp.tool()
-def delete_issue(issue_key: str) -> dict:
+def delete_issue(issue_key: str) -> dict[str, Any]:
     """Delete an issue permanently.
 
     Args:
@@ -324,6 +331,47 @@ def delete_issue(issue_key: str) -> dict:
     with get_client() as client:
         client.delete_issue(issue_key)
         return {"success": True, "issue_key": issue_key, "deleted": True}
+
+
+@mcp.tool()
+def get_issue_quality_report(
+    project: str | None = None,
+    status: str | None = None,
+    jql: str | None = None,
+    limit: int = 50,
+) -> list[dict[str, Any]]:
+    """Generate issue quality report with ratings.
+
+    Analyzes issues and scores them on a 1-10 scale based on:
+    - Description quality (3 pts)
+    - Labels (2 pts)
+    - Assignee (2 pts)
+    - Priority (1 pt)
+    - Attachments (1 pt)
+    - Recent activity (1 pt)
+
+    Args:
+        project: Filter by project key (e.g., "PROJ").
+        status: Filter by status name (e.g., "In Progress").
+        jql: Custom JQL query. If provided, project and status are ignored.
+        limit: Maximum number of issues to analyze (default 50).
+
+    Returns:
+        List of issues with quality ratings.
+    """
+    with get_client() as client:
+        if jql:
+            issues = client.search(jql, limit=limit)
+        else:
+            jql_parts = []
+            if project:
+                jql_parts.append(f"project = {project}")
+            if status:
+                jql_parts.append(f'status = "{status}"')
+            query = " AND ".join(jql_parts) if jql_parts else "ORDER BY created DESC"
+            issues = client.search(query, limit=limit)
+
+        return generate_quality_report(issues)
 
 
 def main() -> None:
