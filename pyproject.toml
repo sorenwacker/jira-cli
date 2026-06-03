@@ -166,3 +166,8 @@ exclude_also = [
 [tool.vulture]
 paths = ["src", "tests"]
 min_confidence = 80
+
+[dependency-groups]
+dev = [
+    "pip-audit>=2.10.0",
+]
