@@ -7,9 +7,21 @@ CLI tool for managing Jira Cloud issues from the terminal.
 
 ## Installation
 
+### Local Development
+
 ```bash
+git clone https://github.com/sorenwacker/jira-cli.git
+cd jira-cli
 uv pip install -e .
 ```
+
+### Global Install with uv
+
+```bash
+uv tool install git+https://github.com/sorenwacker/jira-cli.git
+```
+
+This installs `jira` and `jira-mcp` commands globally.
 
 ## Configuration
 
@@ -141,17 +153,43 @@ jira issue watch PROJ-123
 jira issue unwatch PROJ-123
 ```
 
-## MCP Server (Claude Desktop)
+## MCP Server
 
-The CLI includes an MCP server for integration with Claude Desktop.
+The CLI includes an MCP server for integration with Claude Desktop and Claude Code.
 
-Start the server:
+### Claude Code
 
-```bash
-jira-mcp
+Add to `~/.claude/.mcp.json` for global access:
+
+```json
+{
+  "mcpServers": {
+    "jira": {
+      "command": "uv",
+      "args": ["--directory", "/path/to/jira-cli", "run", "jira-mcp"]
+    }
+  }
+}
 ```
 
-Configure Claude Desktop (`~/Library/Application Support/Claude/claude_desktop_config.json`):
+Or add to your project's `.mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "jira": {
+      "command": "uv",
+      "args": ["run", "jira-mcp"]
+    }
+  }
+}
+```
+
+Restart Claude Code to load the MCP server.
+
+### Claude Desktop
+
+Configure `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
 ```json
 {
@@ -163,7 +201,43 @@ Configure Claude Desktop (`~/Library/Application Support/Claude/claude_desktop_c
 }
 ```
 
-Available tools: `get_issue`, `search_issues`, `get_my_issues`, `create_issue`, `update_issue`, `get_transitions`, `transition_issue`, `get_comments`, `add_comment`, `get_projects`, `get_users`, `watch_issue`, `unwatch_issue`, `delete_issue`
+### Available Tools
+
+| Tool | Description |
+|------|-------------|
+| `get_issue` | Get issue details by key |
+| `search_issues` | Search issues using JQL |
+| `get_my_issues` | Get issues assigned to current user |
+| `create_issue` | Create a new issue or subtask |
+| `update_issue` | Update issue fields |
+| `get_transitions` | Get available status transitions |
+| `transition_issue` | Change issue status |
+| `get_comments` | Get comments for an issue |
+| `add_comment` | Add a comment to an issue |
+| `get_projects` | Get all visible projects |
+| `get_users` | Search for users |
+| `watch_issue` | Start watching an issue |
+| `unwatch_issue` | Stop watching an issue |
+| `delete_issue` | Delete an issue permanently |
+| `get_issue_quality_report` | Generate quality report with ratings (1-10) |
+
+### Issue Quality Report
+
+The `get_issue_quality_report` tool analyzes issues and scores them on a 1-10 scale:
+
+| Criterion | Points | Condition |
+|-----------|--------|-----------|
+| Description | 3 | Present and >50 chars (+1 if short) |
+| Labels | 2 | Has labels |
+| Assignee | 2 | Is assigned |
+| Priority | 1 | Priority set |
+| Attachments | 1 | Has attachments |
+| Activity | 1 | Updated in last 30 days |
+
+Example usage in Claude Code:
+```
+Generate an issue quality report for project DAT
+```
 
 ## Development
 
