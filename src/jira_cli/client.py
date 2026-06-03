@@ -10,6 +10,13 @@ from jira_cli.adf import markdown_to_adf
 from jira_cli.config import JiraConfig
 from jira_cli.models import Comment, Issue, Project, Transition, User
 
+__all__ = [
+    "IssueCreateParams",
+    "IssueUpdateParams",
+    "JiraClient",
+    "UserSearchParams",
+]
+
 ISSUE_FIELDS = [
     "summary",
     "status",
@@ -448,18 +455,11 @@ class IssueUpdateParams:
     assignee: str | None = None
 
 
+@dataclass
 class UserSearchParams:
     """Parameters for searching users."""
 
-    def __init__(
-        self,
-        query: str | None = None,
-        project: str | None = None,
-        limit: int = 1000,
-        include_apps: bool = False,
-    ) -> None:
-        """Initialize user search parameters."""
-        self.query = query
-        self.project = project
-        self.limit = limit
-        self.include_apps = include_apps
+    query: str | None = None
+    project: str | None = None
+    limit: int = 1000
+    include_apps: bool = False

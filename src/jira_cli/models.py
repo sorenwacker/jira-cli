@@ -5,6 +5,15 @@ from typing import Any
 
 from pydantic import BaseModel
 
+__all__ = [
+    "Attachment",
+    "Comment",
+    "Issue",
+    "Project",
+    "Transition",
+    "User",
+]
+
 
 def _parse_jira_datetime(value: str) -> datetime:
     """Parse Jira API datetime string to datetime object."""

@@ -3,6 +3,8 @@
 import re
 from typing import Any
 
+__all__ = ["markdown_to_adf"]
+
 # Block boundary patterns
 _CODE_FENCE = re.compile(r"^```")
 _HEADING = re.compile(r"^#{1,6}\s+")

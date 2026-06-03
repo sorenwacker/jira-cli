@@ -10,7 +10,10 @@ from typing import TYPE_CHECKING
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
-from rich.text import Text
+
+from jira_cli.display import build_comment_panel, build_issue_content, truncate
+
+__all__ = ["JiraShell"]
 
 if TYPE_CHECKING:
     from jira_cli.client import JiraClient
@@ -28,17 +31,6 @@ if HAS_READLINE:
 console = Console()
 
 
-_SIZE_UNITS = [(1024**3, "GB"), (1024**2, "MB"), (1024, "KB")]
-
-
-def _format_size(size_bytes: int) -> str:
-    """Format file size in human-readable format."""
-    for threshold, unit in _SIZE_UNITS:
-        if size_bytes >= threshold:
-            return f"{size_bytes / threshold:.1f} {unit}"
-    return f"{size_bytes} B"
-
-
 def _create_issues_table(issues: list[Issue], title: str) -> Table:
     """Create a Rich table for displaying issues."""
     table = Table(title=title)
@@ -47,14 +39,9 @@ def _create_issues_table(issues: list[Issue], title: str) -> Table:
     table.add_column("Priority")
     table.add_column("Summary")
     for issue in issues:
-        summary = _truncate(issue.summary, 50)
+        summary = truncate(issue.summary, max_len=50)
         table.add_row(issue.key, issue.status, issue.priority or "-", summary)
     return table
-
-
-def _truncate(text: str, length: int) -> str:
-    """Truncate text with ellipsis if needed."""
-    return text[:length] + "..." if len(text) > length else text
 
 
 # Argument mappings: (flags, key, is_int)
@@ -301,34 +288,8 @@ class JiraShell(cmd.Cmd):  # pylint: disable=too-many-public-methods
         except Exception as e:  # noqa: BLE001 - user-facing error
             console.print(f"[red]Error: {e}[/red]")
             return
-        content = self._build_issue_content(issue)
+        content = build_issue_content(issue, include_attachments=True)
         console.print(Panel(content, title=f"[cyan]{issue.key}[/cyan]"))
-
-    def _build_issue_content(self, issue: Issue) -> Text:
-        """Build Rich Text content for an issue."""
-        content = Text()
-        fields = [
-            ("Summary", issue.summary),
-            ("Status", issue.status),
-            ("Priority", issue.priority or "-"),
-            ("Assignee", issue.assignee or "Unassigned"),
-            ("Reporter", issue.reporter or "Unknown"),
-            ("Project", issue.project),
-            ("Created", issue.created.strftime("%Y-%m-%d %H:%M")),
-            ("Updated", issue.updated.strftime("%Y-%m-%d %H:%M")),
-        ]
-        for label, value in fields:
-            content.append(f"{label}: ", style="bold")
-            content.append(f"{value}\n")
-        if issue.description:
-            content.append("\nDescription:\n", style="bold")
-            content.append(issue.description)
-        if issue.attachments:
-            content.append("\n\nAttachments:\n", style="bold")
-            for att in issue.attachments:
-                content.append(f"  - {att.filename} ({_format_size(att.size)})\n")
-                content.append(f"    {att.content_url}\n")
-        return content
 
     def do_show(self, arg: str) -> None:
         """Show issue details."""
@@ -357,12 +318,7 @@ class JiraShell(cmd.Cmd):  # pylint: disable=too-many-public-methods
             return
         console.print(f"[bold]Comments for {self.current_issue}:[/bold]")
         for c in comments:
-            text = Text()
-            text.append(f"{c.author}", style="cyan")
-            text.append(f" - {c.created.strftime('%Y-%m-%d %H:%M')}", style="dim")
-            text.append(f" [id: {c.id}]\n", style="dim")
-            text.append(c.body)
-            console.print(Panel(text))
+            console.print(build_comment_panel(c))
 
     def do_comment(self, arg: str) -> None:
         """Add a comment to current issue."""

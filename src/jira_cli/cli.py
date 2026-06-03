@@ -6,7 +6,6 @@ import typer
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
-from rich.text import Text
 
 from jira_cli.client import (
     IssueCreateParams,
@@ -15,7 +14,10 @@ from jira_cli.client import (
     UserSearchParams,
 )
 from jira_cli.config import JiraConfig, load_config, save_config
+from jira_cli.display import build_comment_panel, build_issue_content, truncate
 from jira_cli.shell import JiraShell
+
+__all__ = ["app"]
 
 if TYPE_CHECKING:
     from jira_cli.models import Comment, Issue
@@ -74,15 +76,10 @@ def _create_issue_table(issues: list["Issue"], title: str) -> Table:
     table.add_column("Summary")
 
     for issue in issues:
-        summary = _truncate(issue.summary, max_len=60)
+        summary = truncate(issue.summary, max_len=60)
         table.add_row(issue.key, issue.status, issue.priority or "-", summary)
 
     return table
-
-
-def _truncate(text: str, *, max_len: int) -> str:
-    """Truncate text with ellipsis if too long."""
-    return text[:max_len] + "..." if len(text) > max_len else text
 
 
 def get_client() -> JiraClient:
@@ -117,31 +114,9 @@ def issue_view(
         issue = client.get_issue(issue_key)
         issue_comments = client.get_comments(issue_key) if comments else []
 
-    content = _build_issue_view_content(issue)
+    content = build_issue_content(issue)
     console.print(Panel(content, title=f"[cyan]{issue.key}[/cyan]"))
     _print_comments(issue_comments, comments)
-
-
-def _build_issue_view_content(issue: "Issue") -> Text:
-    """Build Rich Text content for issue view."""
-    content = Text()
-    fields = [
-        ("Summary", issue.summary),
-        ("Status", issue.status),
-        ("Priority", issue.priority or "-"),
-        ("Assignee", issue.assignee or "Unassigned"),
-        ("Reporter", issue.reporter or "Unknown"),
-        ("Project", issue.project),
-        ("Created", issue.created.strftime("%Y-%m-%d %H:%M")),
-        ("Updated", issue.updated.strftime("%Y-%m-%d %H:%M")),
-    ]
-    for label, value in fields:
-        content.append(f"{label}: ", style="bold")
-        content.append(f"{value}\n")
-    if issue.description:
-        content.append("\nDescription:\n", style="bold")
-        content.append(issue.description)
-    return content
 
 
 def _print_comments(comments: list["Comment"], show: bool) -> None:
@@ -151,12 +126,7 @@ def _print_comments(comments: list["Comment"], show: bool) -> None:
     if comments:
         console.print("\n[bold]Comments:[/bold]")
         for c in comments:
-            text = Text()
-            text.append(f"{c.author}", style="cyan")
-            text.append(f" - {c.created.strftime('%Y-%m-%d %H:%M')}", style="dim")
-            text.append(f" [id: {c.id}]\n", style="dim")
-            text.append(c.body)
-            console.print(Panel(text))
+            console.print(build_comment_panel(c))
     else:
         console.print("\n[dim]No comments[/dim]")
 

@@ -5,6 +5,12 @@ from datetime import UTC, datetime
 
 from jira_cli.models import Issue
 
+__all__ = [
+    "calculate_quality_score",
+    "format_age",
+    "generate_quality_report",
+]
+
 # Scoring thresholds
 DESCRIPTION_MIN_LENGTH = 50
 RECENT_ACTIVITY_DAYS = 30

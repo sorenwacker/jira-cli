@@ -4,6 +4,8 @@ from typing import Any
 
 from fastmcp import FastMCP
 
+__all__ = ["main", "mcp"]
+
 from jira_cli.client import (
     IssueCreateParams,
     IssueUpdateParams,

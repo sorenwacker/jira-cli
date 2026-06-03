@@ -7,6 +7,13 @@ from typing import Any
 
 from pydantic import BaseModel, field_validator
 
+__all__ = [
+    "JiraConfig",
+    "get_config_path",
+    "load_config",
+    "save_config",
+]
+
 
 class JiraConfig(BaseModel):
     """Jira connection configuration."""
