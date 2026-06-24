@@ -13,6 +13,7 @@ from jira_cli.client import (
     UserSearchParams,
 )
 from jira_cli.config import load_config
+from jira_cli.confluence_mcp import register as register_confluence_tools
 from jira_cli.models import Issue
 from jira_cli.quality import generate_quality_report
 
@@ -374,6 +375,9 @@ def get_issue_quality_report(
             issues = client.search(query, limit=limit)
 
         return generate_quality_report(issues)
+
+
+register_confluence_tools(mcp)
 
 
 def main() -> None:
