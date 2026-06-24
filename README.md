@@ -21,7 +21,7 @@ uv pip install -e .
 uv tool install git+https://github.com/sorenwacker/jira-cli.git
 ```
 
-This installs `jira` and `jira-mcp` commands globally.
+This installs `jira`, `jira-mcp`, and `confluence` commands globally.
 
 ## Configuration
 
@@ -153,6 +153,34 @@ jira issue watch PROJ-123
 jira issue unwatch PROJ-123
 ```
 
+## Confluence
+
+The `confluence` command manages Confluence Cloud pages using the same
+Atlassian credentials as `jira`. No extra configuration is needed if `jira`
+already works.
+
+```bash
+# Search content with CQL
+confluence search "text ~ 'roadmap'"
+
+# List spaces
+confluence space list
+
+# Read a page by ID
+confluence page 12345
+confluence page 12345 --raw          # raw storage-format XHTML
+
+# Create a page from markdown
+confluence create --space DEV --title "Notes" --body "# Heading"
+confluence create --space DEV --title "Notes" --file notes.md --parent 12345
+
+# Update a page
+confluence update 12345 --title "New title"
+confluence update 12345 --file notes.md
+```
+
+See [docs/CONFLUENCE.md](docs/CONFLUENCE.md) for details.
+
 ## MCP Server
 
 The CLI includes an MCP server for integration with Claude Desktop and Claude Code.
@@ -220,6 +248,11 @@ Configure `~/Library/Application Support/Claude/claude_desktop_config.json`:
 | `unwatch_issue` | Stop watching an issue |
 | `delete_issue` | Delete an issue permanently |
 | `get_issue_quality_report` | Generate quality report with ratings (1-10) |
+| `confluence_search` | Search Confluence content with CQL |
+| `get_page` | Get a Confluence page by ID, including its body |
+| `list_spaces` | List Confluence spaces |
+| `create_page` | Create a Confluence page from markdown |
+| `update_page` | Update a Confluence page's title and/or body |
 
 ### Issue Quality Report
 

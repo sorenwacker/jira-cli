@@ -17,7 +17,12 @@ jira-cli/
 │       ├── models.py       # Data models (Pydantic)
 │       ├── config.py       # Configuration management
 │       ├── mcp.py          # MCP server for Claude Desktop
-│       └── shell.py        # Interactive shell
+│       ├── shell.py        # Interactive shell
+│       ├── confluence_models.py   # Confluence data models
+│       ├── confluence_storage.py  # Markdown to storage format conversion
+│       ├── confluence_client.py   # Confluence API client
+│       ├── confluence_cli.py      # Confluence Typer CLI
+│       └── confluence_mcp.py      # Confluence MCP tools
 ├── tests/
 │   ├── __init__.py
 │   ├── test_cli.py
@@ -277,6 +282,12 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 | `get_users` | Search users |
 | `watch_issue` | Start watching an issue |
 | `unwatch_issue` | Stop watching an issue |
+
+## Confluence Support
+
+Confluence Cloud management is provided by a separate `confluence` CLI and
+matching MCP tools, reusing the same Atlassian credentials. See
+[CONFLUENCE.md](CONFLUENCE.md) for the full design.
 
 ## Future (v2+)
 
