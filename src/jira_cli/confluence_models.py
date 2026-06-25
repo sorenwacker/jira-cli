@@ -57,9 +57,9 @@ class Page(BaseModel):
             Page instance including its storage-format body when present.
         """
         space_id = data.get("spaceId")
-        version = data.get("version", {}).get("number")
-        body = data.get("body", {}).get("storage", {}).get("value")
-        url = data.get("_links", {}).get("webui")
+        version = (data.get("version") or {}).get("number")
+        body = ((data.get("body") or {}).get("storage") or {}).get("value")
+        url = (data.get("_links") or {}).get("webui")
         return cls(
             id=str(data["id"]),
             title=data["title"],
@@ -81,7 +81,7 @@ class Page(BaseModel):
         Returns:
             Page instance without body or version (not provided by search).
         """
-        content = data.get("content", {})
+        content = data.get("content") or {}
         return cls(
             id=str(content["id"]),
             title=content.get("title", ""),
