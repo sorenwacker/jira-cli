@@ -191,6 +191,22 @@ class TestPageUpdate:
         assert page_id == "12345"
         assert params.title == "New"
 
+    def test_page_update_clears_body_with_empty_string(self) -> None:
+        """An explicit empty --body clears the body rather than keeping it."""
+        with patch(
+            "jira_cli.confluence_cli.load_confluence_config", return_value=mock_config()
+        ):
+            with patch("jira_cli.confluence_cli.ConfluenceClient") as cls:
+                client = create_mock_client()
+                client.update_page.return_value = mock_page()
+                cls.return_value = client
+
+                result = runner.invoke(app, ["update", "12345", "--body", ""])
+
+        assert result.exit_code == 0
+        params = client.update_page.call_args.args[1]
+        assert params.body == ""
+
 
 class TestConfig:
     """Tests for the config command."""

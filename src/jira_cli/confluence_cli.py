@@ -161,7 +161,7 @@ def update(
     file: str | None = typer.Option(None, "--file", "-f", help="Markdown file path"),
 ) -> None:
     """Update a page's title and/or body."""
-    new_body = _resolve_body(body, file) if (body or file) else None
+    new_body = _resolve_body(body, file) if (body is not None or file) else None
     params = PageUpdateParams(title=title, body=new_body)
     with get_client() as client:
         updated = client.update_page(page_id, params)
