@@ -1,12 +1,15 @@
 """Tests for interactive shell."""
 
+import builtins
+import importlib
+import sys
 from datetime import UTC, datetime
 from unittest.mock import MagicMock
 
 import pytest
 
 from jira_cli.models import Comment, Issue, Transition
-from jira_cli.shell import JiraShell
+from jira_cli.shell import JiraShell, _parse_shell_args
 
 
 @pytest.fixture
@@ -225,3 +228,48 @@ class TestShellExit:
         """EOF (Ctrl+D) returns True to exit."""
         result = shell.do_EOF("")
         assert result is True
+
+
+class TestArgParsing:
+    """Tests for shell argument parsing."""
+
+    def test_valid_limit_parsed_as_int(self) -> None:
+        """A numeric --limit is coerced to int."""
+        assert _parse_shell_args("list --limit 5")["limit"] == 5
+
+    def test_invalid_limit_does_not_crash(self) -> None:
+        """A non-integer --limit is skipped instead of raising."""
+        result = _parse_shell_args("list --limit abc")
+        assert "limit" not in result
+
+    def test_invalid_limit_leaves_other_args_intact(self) -> None:
+        """A bad --limit does not discard the surrounding valid flags."""
+        result = _parse_shell_args("list --status Open --limit abc")
+        assert result["status"] == "Open"
+        assert "limit" not in result
+
+
+def test_readline_bound_when_unavailable(monkeypatch: pytest.MonkeyPatch) -> None:
+    """On a platform without readline the module binds a None sentinel.
+
+    Regression guard for the NameError that occurred when the import was
+    skipped and the module-level name was never defined.
+    """
+    import jira_cli.shell as shell_mod
+
+    monkeypatch.setattr(sys, "platform", "win32")
+    monkeypatch.delitem(sys.modules, "readline", raising=False)
+    real_import = builtins.__import__
+
+    def fake_import(name: str, *args: object, **kwargs: object) -> object:
+        if name == "readline":
+            raise ImportError
+        return real_import(name, *args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(builtins, "__import__", fake_import)
+    try:
+        importlib.reload(shell_mod)
+        assert shell_mod.readline is None
+    finally:
+        monkeypatch.undo()
+        importlib.reload(shell_mod)
