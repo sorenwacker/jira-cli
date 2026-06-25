@@ -1,7 +1,7 @@
 """Jira API client."""
 
 import base64
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Self
 
 import httpx
@@ -92,12 +92,26 @@ class JiraClient:
         return " AND ".join(jql_parts)
 
     def _search_issues(self, jql: str, limit: int) -> list[Issue]:
-        """Execute a JQL search and return issues."""
-        body = {"jql": jql, "maxResults": limit, "fields": ISSUE_FIELDS}
-        response = self._client.post("/rest/api/3/search/jql", json=body)
-        response.raise_for_status()
-        data = response.json()
-        return [Issue.from_api_response(issue) for issue in data["issues"]]
+        """Execute a JQL search, paging until the limit or last page is reached."""
+        issues: list[Issue] = []
+        next_token: str | None = None
+        while len(issues) < limit:
+            body: dict[str, Any] = {
+                "jql": jql,
+                "maxResults": limit - len(issues),
+                "fields": ISSUE_FIELDS,
+            }
+            if next_token:
+                body["nextPageToken"] = next_token
+            response = self._client.post("/rest/api/3/search/jql", json=body)
+            response.raise_for_status()
+            data = response.json()
+            page = data.get("issues", [])
+            issues.extend(Issue.from_api_response(issue) for issue in page)
+            next_token = data.get("nextPageToken")
+            if not page or data.get("isLast", True) or not next_token:
+                break
+        return issues[:limit]
 
     def get_issue(self, issue_key: str) -> Issue:
         """Get a single issue by key.
@@ -243,21 +257,25 @@ class JiraClient:
             fields["assignee"] = {"id": params.assignee}
         return fields
 
-    def update_issue(self, issue_key: str, params: "IssueUpdateParams") -> None:
+    def update_issue(self, issue_key: str, params: "IssueUpdateParams") -> bool:
         """Update an issue's fields.
 
         Args:
             issue_key: The issue key (e.g., "PROJ-123").
             params: Issue update parameters.
+
+        Returns:
+            True if a change was sent, False if no fields were provided.
         """
         fields = self._build_update_fields(params)
         if not fields:
-            return
+            return False
         response = self._client.put(
             f"/rest/api/3/issue/{issue_key}",
             json={"fields": fields},
         )
         response.raise_for_status()
+        return True
 
     def _build_update_fields(self, params: "IssueUpdateParams") -> dict[str, Any]:
         """Build fields dict for issue update."""
@@ -439,7 +457,7 @@ class IssueCreateParams:  # pylint: disable=too-many-instance-attributes
     issue_type: str = "Task"
     description: str | None = None
     priority: str | None = None
-    labels: list[str] | None = field(default=None)
+    labels: list[str] | None = None
     assignee: str | None = None
     parent: str | None = None
 
@@ -451,7 +469,7 @@ class IssueUpdateParams:
     summary: str | None = None
     description: str | None = None
     priority: str | None = None
-    labels: list[str] | None = field(default=None)
+    labels: list[str] | None = None
     assignee: str | None = None
 
 
