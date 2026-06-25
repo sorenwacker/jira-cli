@@ -106,7 +106,7 @@ class Page:
     status: str          # e.g., "current"
     version: int | None  # Current version number (absent in search results)
     body: str | None     # Storage-format XHTML (only when fetched in full)
-    url: str | None      # Web UI URL
+    url: str | None      # Server-relative web UI path, not an absolute URL
 ```
 
 ## Markdown to Storage Format Conversion
@@ -162,6 +162,12 @@ The Confluence tools are registered on the same `jira-mcp` server.
 | `list_spaces` | List Confluence spaces |
 | `create_page` | Create a page from markdown |
 | `update_page` | Update a page's title and/or body |
+
+Only `confluence_search` carries a `confluence_` prefix; the page and space
+tools are unprefixed. This is intentional: their names (`get_page`,
+`create_page`, `update_page`, `list_spaces`) do not collide with the
+issue-oriented Jira tools (`get_issue`, `create_issue`, ...) in the shared
+server namespace.
 
 ## Modules
 

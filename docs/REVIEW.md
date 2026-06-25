@@ -62,9 +62,10 @@ analysis and the current single-path test fixtures do not exercise.
 
 ## Resolution
 
-All 6 confirmed findings (H1, M1–M5) were fixed on 2026-06-25, each with a
-regression test. The suite grew from 224 to 238 tests; all baseline gates still
-pass. The 14 unverified appendix notes remain open pending triage.
+All 6 confirmed findings (H1, M1–M5) and all 14 appendix notes (L1–L14) were
+addressed on 2026-06-25. Code fixes carry regression tests; L3 and L5 were
+resolved as documentation (see the Disposition column). The suite grew from 224
+to 248 tests; all baseline gates still pass.
 
 ## Confirmed findings
 
@@ -157,24 +158,25 @@ single-paragraph, so it is untested.
 Fix: separate distinct block-level nodes with a newline, mirroring
 `storage_to_text`'s block separation.
 
-## Appendix — unverified lower-confidence findings
+## Appendix — lower-confidence findings (all addressed)
 
 These were raised by reviewers but not run through the adversarial verifier
-(`verifyLow: false`). They are plausible and mostly narrow; triage before acting.
+(`verifyLow: false`). All were triaged and addressed: code fixes carry tests;
+L3 and L5 were resolved as documentation.
 
-| # | Severity | File:line | Note |
-|---|----------|-----------|------|
-| L1 | low | `confluence_storage.py:150` | `_code_macro` does not escape a `]]>` terminator inside CDATA; code containing `]]>` produces malformed storage. |
-| L2 | low | `confluence_storage.py:246` | `_BLOCK_CLOSE` matches `</tr>`/`</table>` but not `</td>`/`</th>`; row cells render with no separator (`ab\ncd`). Display-only. |
-| L3 | low | `confluence_models.py:47` | `Page.url` is a relative `webui` path but is surfaced via MCP as an absolute `url`. |
-| L4 | low | `confluence_cli.py:164` | `--body ""` cannot clear a page body: `(body or file)` is falsy, so it is treated as "keep existing". |
-| L5 | low | `confluence_mcp.py:65` | `get_page`/`create_page`/`update_page`/`list_spaces` lack a `confluence_` prefix in a namespace shared with Jira tools. |
-| L6 | low | `adf.py:26` | Intra-word underscores parsed as italic (`some_variable_name`); no word-boundary constraint. |
-| L7 | low | `adf.py:13` | Spaced thematic break `* * *` is parsed as a bullet list (hrule matches only contiguous runs). |
-| L8 | low | `client.py:442` | `labels: ... = field(default=None)` is equivalent to plain `= None`; only reason `field` is imported. |
-| L9 | low | `client.py:94` | `_search_issues` reads only the first page; no `nextPageToken` pagination above the server `maxResults` cap. |
-| L10 | low | `cli.py:289` | `issue edit` prints "Updated" even when `update_issue` short-circuits on an empty field set. |
-| L11 | low | `cli.py:442` | Duplicate of L8 (observed via cli usage of the client dataclasses). |
-| L12 | low | `mcp.py:7` | `__all__` sits mid-import-block, unlike the mirrored `confluence_mcp.py` which places it after imports. |
-| L13 | low | `mcp.py:23` | `_issue_to_dict(full=True)` omits `labels` and `attachments` though the model carries them and the create/update tools accept labels. |
-| L14 | low | `config.py:114` | `save_config` builds TOML by raw f-string interpolation; a token containing `"` or `\` yields malformed TOML that `load_config` cannot parse. |
+| # | File:line | Note | Disposition |
+|---|-----------|------|-------------|
+| L1 | `confluence_storage.py` | `_code_macro` did not escape a `]]>` CDATA terminator; could emit malformed storage. | Fixed — split terminator, round-trip test. |
+| L2 | `confluence_storage.py` | Table row cells rendered with no separator. | Fixed — cells separated by tab. |
+| L3 | `confluence_models.py:47` | `Page.url` is a relative `webui` path surfaced as `url`. | Documented — field comment + CONFLUENCE.md. |
+| L4 | `confluence_cli.py` | `--body ""` could not clear a page body. | Fixed — guard on `body is not None`. |
+| L5 | `confluence_mcp.py` | Page/space tools lack a `confluence_` prefix. | Documented — intentional, no collision; noted in CONFLUENCE.md. |
+| L6 | `adf.py` | Intra-word underscores parsed as italic. | Fixed — word-boundary guard (both converters). |
+| L7 | `adf.py` | Spaced thematic break `* * *` parsed as a bullet. | Fixed — spaced-aware hrule (both converters). |
+| L8 | `client.py` | Redundant `field(default=None)`. | Fixed — plain `= None`, `field` import dropped. |
+| L9 | `client.py` | Search read only the first page. | Fixed — pages over `nextPageToken`, test. |
+| L10 | `cli.py` | "Updated" printed even on a no-op edit. | Fixed — `update_issue` returns changed flag. |
+| L11 | `cli.py` | Duplicate of L8. | Fixed with L8. |
+| L12 | `mcp.py` | `__all__` mid-import-block. | Fixed — moved after imports. |
+| L13 | `mcp.py` | Full issue dict omitted labels/attachments. | Fixed — both included, test. |
+| L14 | `config.py` | `save_config` interpolated TOML without escaping. | Fixed — `_toml_string` escaping, round-trip test. |

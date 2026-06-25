@@ -44,6 +44,7 @@ class Page(BaseModel):
     status: str = ""
     version: int | None = None
     body: str | None = None
+    # Server-relative web UI path (e.g. "/spaces/DEV/pages/123/Title"), not absolute.
     url: str | None = None
 
     @classmethod
