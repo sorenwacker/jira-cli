@@ -116,6 +116,22 @@ class TestSaveConfig:
         assert "test@example.com" in content
         assert "token123" in content
 
+    def test_save_config_escapes_special_characters(self, tmp_path: Path) -> None:
+        """A token with quotes or backslashes round-trips through save/load."""
+        config_file = tmp_path / "config.toml"
+        token = 'to"ken\\with"specials'
+        config = JiraConfig(
+            url="https://test.atlassian.net",
+            email="test@example.com",
+            api_token=token,
+        )
+
+        save_config(config, config_path=config_file)
+        with patch.dict(os.environ, {}, clear=True):
+            loaded = load_config(config_path=config_file)
+
+        assert loaded.api_token == token
+
     def test_save_config_creates_parent_dirs(self, tmp_path: Path) -> None:
         """Save creates parent directories if needed."""
         config_file = tmp_path / "subdir" / "config.toml"

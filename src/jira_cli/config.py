@@ -111,11 +111,18 @@ def save_config(config: JiraConfig, config_path: Path | None = None) -> None:
         config_path = get_config_path()
 
     config_path.parent.mkdir(parents=True, exist_ok=True)
-    content = f"""url = "{config.url}"
-email = "{config.email}"
-api_token = "{config.api_token}"
-"""
+    content = (
+        f"url = {_toml_string(config.url)}\n"
+        f"email = {_toml_string(config.email)}\n"
+        f"api_token = {_toml_string(config.api_token)}\n"
+    )
     config_path.write_text(content)
+
+
+def _toml_string(value: str) -> str:
+    """Render a value as a TOML basic string, escaping backslashes and quotes."""
+    escaped = value.replace("\\", "\\\\").replace('"', '\\"')
+    return f'"{escaped}"'
 
 
 def _get_confluence_config_values(
