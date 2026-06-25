@@ -11,6 +11,7 @@ from html import escape, unescape
 __all__ = ["markdown_to_storage", "storage_to_text"]
 
 _HEADING = re.compile(r"^(#{1,6})\s+(.+)$")
+_TASK = re.compile(r"^[-*]\s+\[([ xX])\]\s+(.+)$")
 _BULLET = re.compile(r"^[-*]\s+(.+)$")
 _NUMBERED = re.compile(r"^\d+\.\s+(.+)$")
 _HRULE = re.compile(r"^(-{3,}|\*{3,}|_{3,})$")
@@ -89,6 +90,28 @@ def _try_hrule(lines: list[str], i: int) -> tuple[str, int] | None:
     return "<hr/>", i + 1
 
 
+def _try_task(lines: list[str], i: int) -> tuple[str, int] | None:
+    """Parse a checkbox list into a Confluence task-list macro."""
+    if not _TASK.match(lines[i]):
+        return None
+    tasks: list[str] = []
+    j = i
+    task_id = 1
+    while j < len(lines):
+        match = _TASK.match(lines[j])
+        if not match:
+            break
+        status = "complete" if match.group(1).lower() == "x" else "incomplete"
+        tasks.append(
+            f"<ac:task><ac:task-id>{task_id}</ac:task-id>"
+            f"<ac:task-status>{status}</ac:task-status>"
+            f"<ac:task-body>{_inline(match.group(2))}</ac:task-body></ac:task>"
+        )
+        task_id += 1
+        j += 1
+    return f"<ac:task-list>{''.join(tasks)}</ac:task-list>", j
+
+
 def _try_bullet(lines: list[str], i: int) -> tuple[str, int] | None:
     """Parse a bullet list."""
     if not _BULLET.match(lines[i]):
@@ -103,7 +126,14 @@ def _try_ordered(lines: list[str], i: int) -> tuple[str, int] | None:
     return _list_block(lines, i, _NUMBERED, "ol")
 
 
-_BLOCK_PARSERS = [_try_code, _try_heading, _try_hrule, _try_bullet, _try_ordered]
+_BLOCK_PARSERS = [
+    _try_code,
+    _try_heading,
+    _try_hrule,
+    _try_task,
+    _try_bullet,
+    _try_ordered,
+]
 
 
 def _code_macro(language: str, code: str) -> str:
@@ -208,8 +238,19 @@ _CDATA = re.compile(
     r"<ac:plain-text-body><!\[CDATA\[(.*?)\]\]></ac:plain-text-body>",
     re.DOTALL,
 )
+_TASK_ITEM = re.compile(
+    r"<ac:task>.*?<ac:task-status>(\w+)</ac:task-status>"
+    r".*?<ac:task-body>(.*?)</ac:task-body>.*?</ac:task>",
+    re.DOTALL | re.IGNORECASE,
+)
 _BLOCK_CLOSE = re.compile(r"</(p|h[1-6]|li|ul|ol|tr|table)>", re.IGNORECASE)
 _TAG = re.compile(r"<[^>]+>")
+
+
+def _render_task(match: re.Match[str]) -> str:
+    """Render a single task macro as a bracketed checkbox line."""
+    mark = "x" if match.group(1).lower() == "complete" else " "
+    return f"\n[{mark}] {match.group(2)}\n"
 
 
 def storage_to_text(storage: str | None) -> str:
@@ -225,6 +266,7 @@ def storage_to_text(storage: str | None) -> str:
         return ""
 
     text = _CDATA.sub(lambda m: f"{m.group(1)}\n", storage)
+    text = _TASK_ITEM.sub(_render_task, text)
     text = _BLOCK_CLOSE.sub("\n", text)
     text = text.replace("<hr/>", "\n").replace("<br/>", "\n")
     text = _TAG.sub("", text)

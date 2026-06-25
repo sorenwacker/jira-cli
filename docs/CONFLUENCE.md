@@ -123,6 +123,7 @@ storage format. The supported syntax mirrors the Jira ADF converter:
 | `` `code` `` | `<code>` |
 | ```` ```lang ```` | `code` macro with language parameter |
 | `- item` | `<ul><li>` |
+| `- [ ] item` / `- [x] item` | `task-list` macro (unchecked / checked) |
 | `1. item` | `<ol><li>` |
 | `[text](url)` | `<a href>` |
 | `---` | `<hr/>` |
