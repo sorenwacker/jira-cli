@@ -234,6 +234,12 @@ def _emphasis_node(match: re.Match[str]) -> str:
     return f"<em>{inner}</em>"
 
 
+_CODE_MACRO = re.compile(
+    r'<ac:structured-macro[^>]*ac:name="code".*?'
+    r"<ac:plain-text-body><!\[CDATA\[(.*?)\]\]></ac:plain-text-body>"
+    r".*?</ac:structured-macro>",
+    re.DOTALL,
+)
 _CDATA = re.compile(
     r"<ac:plain-text-body><!\[CDATA\[(.*?)\]\]></ac:plain-text-body>",
     re.DOTALL,
@@ -265,7 +271,8 @@ def storage_to_text(storage: str | None) -> str:
     if not storage:
         return ""
 
-    text = _CDATA.sub(lambda m: f"{m.group(1)}\n", storage)
+    text = _CODE_MACRO.sub(lambda m: f"\n{m.group(1)}\n", storage)
+    text = _CDATA.sub(lambda m: f"{m.group(1)}\n", text)
     text = _TASK_ITEM.sub(_render_task, text)
     text = _BLOCK_CLOSE.sub("\n", text)
     text = text.replace("<hr/>", "\n").replace("<br/>", "\n")

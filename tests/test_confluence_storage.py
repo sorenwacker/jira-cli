@@ -111,6 +111,11 @@ class TestStorageToText:
         )
         assert "print('hi')" in storage_to_text(storage)
 
+    def test_code_macro_with_language_round_trip(self) -> None:
+        """A language-tagged code block round-trips without leaking the language."""
+        storage = markdown_to_storage("```python\nprint(1)\n```")
+        assert storage_to_text(storage) == "print(1)"
+
     def test_task_list_rendered_with_checkboxes(self) -> None:
         """Task list items render as bracketed checkboxes."""
         storage = (
