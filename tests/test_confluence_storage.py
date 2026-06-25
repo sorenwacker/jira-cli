@@ -116,6 +116,19 @@ class TestStorageToText:
         storage = markdown_to_storage("```python\nprint(1)\n```")
         assert storage_to_text(storage) == "print(1)"
 
+    def test_code_block_with_cdata_terminator_round_trips(self) -> None:
+        """Code containing ']]>' yields valid storage and round-trips."""
+        storage = markdown_to_storage("```\nfoo ]]> bar\n```")
+        assert "]]]]><![CDATA[>" in storage
+        assert storage_to_text(storage) == "foo ]]> bar"
+
+    def test_table_cells_separated(self) -> None:
+        """Cells in a row are separated rather than concatenated."""
+        storage = (
+            "<table><tr><td>a</td><td>b</td></tr><tr><td>c</td><td>d</td></tr></table>"
+        )
+        assert storage_to_text(storage) == "a\tb\nc\td"
+
     def test_task_list_rendered_with_checkboxes(self) -> None:
         """Task list items render as bracketed checkboxes."""
         storage = (

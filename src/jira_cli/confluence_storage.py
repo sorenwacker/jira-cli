@@ -14,14 +14,15 @@ _HEADING = re.compile(r"^(#{1,6})\s+(.+)$")
 _TASK = re.compile(r"^[-*]\s+\[([ xX])\]\s+(.+)$")
 _BULLET = re.compile(r"^[-*]\s+(.+)$")
 _NUMBERED = re.compile(r"^\d+\.\s+(.+)$")
-_HRULE = re.compile(r"^(-{3,}|\*{3,}|_{3,})$")
+# A thematic break: three or more of the same marker, optionally space-separated.
+_HRULE = re.compile(r"^ *([-*_])( *\1){2,} *$")
 
 _INLINE_PATTERN = re.compile(
     r"(?P<bold_italic>\*\*\*(?P<bold_italic_text>.+?)\*\*\*)"
     r"|(?P<bold_ast>\*\*(?P<bold_ast_text>.+?)\*\*)"
-    r"|(?P<bold_under>__(?P<bold_under_text>.+?)__)"
+    r"|(?P<bold_under>(?<![A-Za-z0-9])__(?P<bold_under_text>.+?)__(?![A-Za-z0-9]))"
     r"|(?P<italic_ast>\*(?P<italic_ast_text>[^*]+?)\*)"
-    r"|(?P<italic_under>_(?P<italic_under_text>[^_]+?)_)"
+    r"|(?P<italic_under>(?<![A-Za-z0-9])_(?P<italic_under_text>[^_]+?)_(?![A-Za-z0-9]))"
     r"|(?P<code>`(?P<code_text>[^`]+?)`)"
     r"|(?P<link>\[(?P<link_text>[^\]]+?)\]\((?P<link_url>[^)]+?)\))"
 )
@@ -136,6 +137,9 @@ _BLOCK_PARSERS = [
 ]
 
 
+_CDATA_SPLIT = "]]]]><![CDATA[>"
+
+
 def _code_macro(language: str, code: str) -> str:
     """Build a Confluence code macro for a code block."""
     lang = (
@@ -144,10 +148,11 @@ def _code_macro(language: str, code: str) -> str:
         if language
         else ""
     )
+    safe_code = code.replace("]]>", _CDATA_SPLIT)
     return (
         '<ac:structured-macro ac:name="code">'
         f"{lang}"
-        f"<ac:plain-text-body><![CDATA[{code}]]></ac:plain-text-body>"
+        f"<ac:plain-text-body><![CDATA[{safe_code}]]></ac:plain-text-body>"
         "</ac:structured-macro>"
     )
 
@@ -250,6 +255,7 @@ _TASK_ITEM = re.compile(
     re.DOTALL | re.IGNORECASE,
 )
 _BLOCK_CLOSE = re.compile(r"</(p|h[1-6]|li|ul|ol|tr|table)>", re.IGNORECASE)
+_CELL_CLOSE = re.compile(r"</t[dh]>", re.IGNORECASE)
 _TAG = re.compile(r"<[^>]+>")
 
 
@@ -257,6 +263,11 @@ def _render_task(match: re.Match[str]) -> str:
     """Render a single task macro as a bracketed checkbox line."""
     mark = "x" if match.group(1).lower() == "complete" else " "
     return f"\n[{mark}] {match.group(2)}\n"
+
+
+def _render_code_macro(match: re.Match[str]) -> str:
+    """Render a code macro body, undoing CDATA-terminator splitting."""
+    return f"\n{match.group(1).replace(_CDATA_SPLIT, ']]>')}\n"
 
 
 def storage_to_text(storage: str | None) -> str:
@@ -271,9 +282,10 @@ def storage_to_text(storage: str | None) -> str:
     if not storage:
         return ""
 
-    text = _CODE_MACRO.sub(lambda m: f"\n{m.group(1)}\n", storage)
+    text = _CODE_MACRO.sub(_render_code_macro, storage)
     text = _CDATA.sub(lambda m: f"{m.group(1)}\n", text)
     text = _TASK_ITEM.sub(_render_task, text)
+    text = _CELL_CLOSE.sub("\t", text)
     text = _BLOCK_CLOSE.sub("\n", text)
     text = text.replace("<hr/>", "\n").replace("<br/>", "\n")
     text = _TAG.sub("", text)
