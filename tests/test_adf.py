@@ -169,6 +169,12 @@ class TestCodeBlocks:
         assert "    indented" in text
         assert "        more" in text
 
+    def test_empty_code_block_omits_text_node(self) -> None:
+        """An empty fenced block has empty content (ADF rejects empty text)."""
+        block = markdown_to_adf("```\n```")["content"][0]
+        assert block["type"] == "codeBlock"
+        assert block["content"] == []
+
 
 class TestLists:
     """Tests for list conversion."""

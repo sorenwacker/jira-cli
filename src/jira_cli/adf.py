@@ -186,9 +186,12 @@ def _parse_code_block(lines: list[str], start: int) -> tuple[dict[str, Any], int
         i += 1
 
     code_text = "\n".join(code_lines)
+    content: list[dict[str, Any]] = []
+    if code_text:
+        content.append({"type": "text", "text": code_text})
     block: dict[str, Any] = {
         "type": "codeBlock",
-        "content": [{"type": "text", "text": code_text}],
+        "content": content,
     }
     if language:
         block["attrs"] = {"language": language}
