@@ -176,13 +176,38 @@ class User(BaseModel):
         )
 
 
+_ADF_BLOCK_TYPES = frozenset(
+    {
+        "paragraph",
+        "heading",
+        "blockquote",
+        "codeBlock",
+        "bulletList",
+        "orderedList",
+        "listItem",
+        "rule",
+        "panel",
+    }
+)
+
+
 def _extract_adf_node_text(node: dict[str, Any]) -> str:
-    """Recursively extract text from a single ADF node."""
+    """Recursively extract text from a single ADF node.
+
+    Block-level children are separated by a newline so distinct paragraphs and
+    list items do not run together, mirroring the Confluence renderer.
+    """
     if node.get("type") == "text":
         text = node.get("text", "")
         return str(text) if text else ""
     content: list[dict[str, Any]] = node.get("content", [])
-    return "".join(_extract_adf_node_text(child) for child in content)
+    parts: list[str] = []
+    for child in content:
+        child_text = _extract_adf_node_text(child)
+        if child.get("type") in _ADF_BLOCK_TYPES and not child_text.endswith("\n"):
+            child_text += "\n"
+        parts.append(child_text)
+    return "".join(parts)
 
 
 def _extract_text_from_adf(adf: dict[str, Any] | None) -> str | None:
@@ -190,4 +215,4 @@ def _extract_text_from_adf(adf: dict[str, Any] | None) -> str | None:
     if adf is None:
         return None
     text = _extract_adf_node_text(adf)
-    return text or None
+    return text.strip() or None

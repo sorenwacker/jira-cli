@@ -1,6 +1,52 @@
 """Tests for Jira data models."""
 
-from jira_cli.models import Attachment, Comment, Issue, Transition
+from jira_cli.models import (
+    Attachment,
+    Comment,
+    Issue,
+    Transition,
+    _extract_text_from_adf,
+)
+
+
+def _paragraph(text: str) -> dict:
+    """Build an ADF paragraph node with a single text run."""
+    return {"type": "paragraph", "content": [{"type": "text", "text": text}]}
+
+
+def _doc(*blocks: dict) -> dict:
+    """Wrap block nodes in an ADF doc."""
+    return {"type": "doc", "version": 1, "content": list(blocks)}
+
+
+class TestExtractTextFromAdf:
+    """Tests for _extract_text_from_adf block handling."""
+
+    def test_none_returns_none(self) -> None:
+        """A missing ADF document yields None."""
+        assert _extract_text_from_adf(None) is None
+
+    def test_single_paragraph_has_no_trailing_newline(self) -> None:
+        """A single paragraph extracts to its text only."""
+        assert _extract_text_from_adf(_doc(_paragraph("First."))) == "First."
+
+    def test_blocks_separated_by_newline(self) -> None:
+        """Distinct block nodes are separated, not concatenated."""
+        adf = _doc(_paragraph("First."), _paragraph("Second."))
+        assert _extract_text_from_adf(adf) == "First.\nSecond."
+
+    def test_list_items_separated(self) -> None:
+        """Bullet list items each render on their own line."""
+        adf = _doc(
+            {
+                "type": "bulletList",
+                "content": [
+                    {"type": "listItem", "content": [_paragraph("one")]},
+                    {"type": "listItem", "content": [_paragraph("two")]},
+                ],
+            }
+        )
+        assert _extract_text_from_adf(adf) == "one\ntwo"
 
 
 class TestIssue:
