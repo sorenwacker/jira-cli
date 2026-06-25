@@ -94,6 +94,15 @@ class TestGetIssue:
         assert result["status"] == "To Do"
         client.get_issue.assert_called_with("PROJ-123")
 
+    def test_get_issue_includes_labels_and_attachments(self) -> None:
+        """The full issue dict carries labels and attachments."""
+        from jira_cli.mcp import _issue_to_dict
+
+        result = _issue_to_dict(mock_issue(), full=True)
+
+        assert result["labels"] == ["bug", "urgent"]
+        assert result["attachments"] == []
+
 
 class TestSearchIssues:
     """Tests for search_issues tool."""

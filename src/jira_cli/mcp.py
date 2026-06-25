@@ -4,8 +4,6 @@ from typing import Any
 
 from fastmcp import FastMCP
 
-__all__ = ["main", "mcp"]
-
 from jira_cli.client import (
     IssueCreateParams,
     IssueUpdateParams,
@@ -16,6 +14,8 @@ from jira_cli.config import load_config
 from jira_cli.confluence_mcp import register as register_confluence_tools
 from jira_cli.models import Issue
 from jira_cli.quality import generate_quality_report
+
+__all__ = ["main", "mcp"]
 
 mcp = FastMCP("Jira")
 
@@ -37,6 +37,8 @@ def _issue_to_dict(issue: Issue, *, full: bool = False) -> dict[str, Any]:
                 "description": issue.description,
                 "created": issue.created.isoformat(),
                 "updated": issue.updated.isoformat(),
+                "labels": issue.labels,
+                "attachments": [a.model_dump(mode="json") for a in issue.attachments],
             }
         )
     return result
@@ -167,8 +169,8 @@ def update_issue(
         assignee=assignee,
     )
     with get_client() as client:
-        client.update_issue(issue_key, params)
-        return {"success": True, "issue_key": issue_key}
+        updated = client.update_issue(issue_key, params)
+        return {"success": True, "updated": updated, "issue_key": issue_key}
 
 
 @mcp.tool()
