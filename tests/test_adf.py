@@ -47,6 +47,23 @@ class TestPlainText:
         assert result == {"type": "doc", "version": 1, "content": []}
 
 
+class TestUnderscoreEmphasis:
+    """Tests for underscore emphasis word-boundary handling."""
+
+    def test_intra_word_underscores_not_italic(self) -> None:
+        """Underscores inside a word do not create emphasis."""
+        nodes = markdown_to_adf("some_variable_name")["content"][0]["content"]
+        assert len(nodes) == 1
+        assert nodes[0]["text"] == "some_variable_name"
+        assert "marks" not in nodes[0]
+
+    def test_underscore_emphasis_at_word_boundary(self) -> None:
+        """Underscore emphasis at word boundaries still applies."""
+        first = markdown_to_adf("_italic_ word")["content"][0]["content"][0]
+        assert first["text"] == "italic"
+        assert first["marks"] == [{"type": "em"}]
+
+
 class TestInlineFormatting:
     """Tests for inline formatting."""
 
@@ -218,6 +235,11 @@ class TestHorizontalRule:
         result = markdown_to_adf("Above\n\n---\n\nBelow")
         types = [node["type"] for node in result["content"]]
         assert "rule" in types
+
+    def test_spaced_thematic_break_is_rule_not_bullet(self) -> None:
+        """A space-separated thematic break is a rule, not a bullet list."""
+        result = markdown_to_adf("* * *")
+        assert result["content"][0]["type"] == "rule"
 
     def test_horizontal_rule_asterisks(self) -> None:
         """*** becomes rule."""
