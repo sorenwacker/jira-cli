@@ -284,9 +284,12 @@ def issue_edit(
         assignee=assignee,
     )
     with get_client() as client:
-        client.update_issue(issue_key, params)
+        changed = client.update_issue(issue_key, params)
 
-    console.print(f"[green]Updated {issue_key}[/green]")
+    if changed:
+        console.print(f"[green]Updated {issue_key}[/green]")
+    else:
+        console.print(f"[yellow]No fields to update for {issue_key}[/yellow]")
 
 
 @issue_app.command("search")
