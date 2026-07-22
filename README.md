@@ -187,20 +187,16 @@ The CLI includes an MCP server for integration with Claude Desktop and Claude Co
 
 ### Claude Code
 
-Add to `~/.claude/.mcp.json` for global access:
+Register the server at user scope so it is available in every directory:
 
-```json
-{
-  "mcpServers": {
-    "jira": {
-      "command": "uv",
-      "args": ["--directory", "/path/to/jira-cli", "run", "jira-mcp"]
-    }
-  }
-}
+```bash
+claude mcp add jira --scope user -- "$(command -v jira-mcp)"
 ```
 
-Or add to your project's `.mcp.json`:
+This requires the global install above. User scope stores the entry in
+`~/.claude.json`; verify it with `claude mcp list`.
+
+To share the server with a repository instead, add a project `.mcp.json`:
 
 ```json
 {
