@@ -8,15 +8,17 @@ from typing import Any
 from pydantic import BaseModel, field_validator
 
 __all__ = [
+    "ConfluenceConfig",
     "JiraConfig",
     "get_config_path",
     "load_config",
+    "load_confluence_config",
     "save_config",
 ]
 
 
-class JiraConfig(BaseModel):
-    """Jira connection configuration."""
+class _AtlassianConfig(BaseModel):
+    """Atlassian Cloud connection configuration shared by products."""
 
     url: str
     email: str
@@ -27,6 +29,14 @@ class JiraConfig(BaseModel):
     def normalize_url(cls, v: str) -> str:
         """Remove trailing slashes from URL."""
         return v.rstrip("/")
+
+
+class JiraConfig(_AtlassianConfig):
+    """Jira connection configuration."""
+
+
+class ConfluenceConfig(_AtlassianConfig):
+    """Confluence connection configuration."""
 
 
 def get_config_path() -> Path:
@@ -101,8 +111,65 @@ def save_config(config: JiraConfig, config_path: Path | None = None) -> None:
         config_path = get_config_path()
 
     config_path.parent.mkdir(parents=True, exist_ok=True)
-    content = f"""url = "{config.url}"
-email = "{config.email}"
-api_token = "{config.api_token}"
-"""
+    content = (
+        f"url = {_toml_string(config.url)}\n"
+        f"email = {_toml_string(config.email)}\n"
+        f"api_token = {_toml_string(config.api_token)}\n"
+    )
     config_path.write_text(content)
+
+
+def _toml_string(value: str) -> str:
+    """Render a value as a TOML basic string, escaping backslashes and quotes."""
+    escaped = value.replace("\\", "\\\\").replace('"', '\\"')
+    return f'"{escaped}"'
+
+
+def _get_confluence_config_values(
+    file_config: dict[str, Any],
+) -> tuple[str | None, ...]:
+    """Resolve Confluence config, falling back to Jira values.
+
+    Resolution order per value: CONFLUENCE_* env, then JIRA_* env, then file.
+    """
+    url = (
+        os.environ.get("CONFLUENCE_URL")
+        or os.environ.get("JIRA_URL")
+        or file_config.get("url")
+    )
+    email = (
+        os.environ.get("CONFLUENCE_EMAIL")
+        or os.environ.get("JIRA_EMAIL")
+        or file_config.get("email")
+    )
+    api_token = (
+        os.environ.get("CONFLUENCE_API_TOKEN")
+        or os.environ.get("JIRA_API_TOKEN")
+        or file_config.get("api_token")
+    )
+    return url, email, api_token
+
+
+def load_confluence_config(config_path: Path | None = None) -> ConfluenceConfig:
+    """Load Confluence configuration from file and/or environment variables.
+
+    Confluence reuses the Jira credentials unless Confluence-specific values are
+    provided. Environment variables take precedence over file values.
+
+    Args:
+        config_path: Path to config file. Defaults to ~/.config/jira-cli/config.toml
+
+    Returns:
+        ConfluenceConfig with loaded values.
+
+    Raises:
+        ValueError: If required configuration values are missing.
+    """
+    if config_path is None:
+        config_path = get_config_path()
+
+    file_config = _load_file_config(config_path)
+    url, email, api_token = _get_confluence_config_values(file_config)
+    _validate_required(url, email, api_token)
+
+    return ConfluenceConfig(url=str(url), email=str(email), api_token=str(api_token))

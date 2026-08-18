@@ -10,7 +10,8 @@ _CODE_FENCE = re.compile(r"^```")
 _HEADING = re.compile(r"^#{1,6}\s+")
 _BULLET = re.compile(r"^[-*]\s+")
 _NUMBERED = re.compile(r"^\d+\.\s+")
-_HRULE = re.compile(r"^(-{3,}|\*{3,}|_{3,})$")
+# A thematic break: three or more of the same marker, optionally space-separated.
+_HRULE = re.compile(r"^ *([-*_])( *\1){2,} *$")
 
 # Block patterns with capture
 _HEADING_FULL = re.compile(r"^(#{1,6})\s+(.+)$")
@@ -21,9 +22,9 @@ _NUMBERED_ITEM = re.compile(r"^\d+\.\s+(.+)$")
 _INLINE_PATTERN = re.compile(
     r"(?P<bold_italic>\*\*\*(?P<bold_italic_text>.+?)\*\*\*)"
     r"|(?P<bold_ast>\*\*(?P<bold_ast_text>.+?)\*\*)"
-    r"|(?P<bold_under>__(?P<bold_under_text>.+?)__)"
+    r"|(?P<bold_under>(?<![A-Za-z0-9])__(?P<bold_under_text>.+?)__(?![A-Za-z0-9]))"
     r"|(?P<italic_ast>\*(?P<italic_ast_text>[^*]+?)\*)"
-    r"|(?P<italic_under>_(?P<italic_under_text>[^_]+?)_)"
+    r"|(?P<italic_under>(?<![A-Za-z0-9])_(?P<italic_under_text>[^_]+?)_(?![A-Za-z0-9]))"
     r"|(?P<code>`(?P<code_text>[^`]+?)`)"
     r"|(?P<link>\[(?P<link_text>[^\]]+?)\]\((?P<link_url>[^)]+?)\))"
 )
@@ -186,9 +187,12 @@ def _parse_code_block(lines: list[str], start: int) -> tuple[dict[str, Any], int
         i += 1
 
     code_text = "\n".join(code_lines)
+    content: list[dict[str, Any]] = []
+    if code_text:
+        content.append({"type": "text", "text": code_text})
     block: dict[str, Any] = {
         "type": "codeBlock",
-        "content": [{"type": "text", "text": code_text}],
+        "content": content,
     }
     if language:
         block["attrs"] = {"language": language}

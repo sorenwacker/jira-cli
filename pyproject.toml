@@ -30,6 +30,7 @@ dev = [
 [project.scripts]
 jira = "jira_cli.cli:app"
 jira-mcp = "jira_cli.mcp:main"
+confluence = "jira_cli.confluence_cli:app"
 
 [build-system]
 requires = ["hatchling"]
@@ -92,7 +93,10 @@ max-statements = 20
     "PLC0415",  # imports in tests for isolation
 ]
 # CLI uses typer patterns - function args are CLI params, not code smell
-"src/jira_cli/cli.py" = ["FBT001", "FBT002", "FBT003", "PLR2004", "PLR0913"]
+"src/jira_cli/cli.py" = ["FBT001", "FBT002", "FBT003", "PLR2004", "PLR0913", "PLR0917"]
+"src/jira_cli/confluence_cli.py" = [
+    "FBT001", "FBT002", "FBT003", "PLR2004", "PLR0913", "PLR0917",
+]
 # Shell uses cmd patterns - complexity unavoidable, do_EOF is a cmd.Cmd convention
 "src/jira_cli/shell.py" = [
     "FBT001", "FBT002", "FBT003", "PLR2004", "C901", "PLR0915",
@@ -101,9 +105,10 @@ max-statements = 20
     "PLC0415",  # local imports avoid circular deps
 ]
 # MCP tools use fastmcp patterns - function args are tool params
-"src/jira_cli/mcp.py" = ["FBT001", "FBT002", "FBT003", "PLR0913"]
+"src/jira_cli/mcp.py" = ["FBT001", "FBT002", "FBT003", "PLR0913", "PLR0917"]
+"src/jira_cli/confluence_mcp.py" = ["FBT001", "FBT002", "FBT003", "PLR0913", "PLR0917"]
 # Client has param dataclasses with many init args by design
-"src/jira_cli/client.py" = ["PLR0913", "FBT001", "FBT002"]
+"src/jira_cli/client.py" = ["PLR0913", "PLR0917", "FBT001", "FBT002"]
 
 [tool.pylint.main]
 load-plugins = []

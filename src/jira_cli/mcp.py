@@ -2,9 +2,8 @@
 
 from typing import Any
 
+import httpx
 from fastmcp import FastMCP
-
-__all__ = ["main", "mcp"]
 
 from jira_cli.client import (
     IssueCreateParams,
@@ -13,10 +12,70 @@ from jira_cli.client import (
     UserSearchParams,
 )
 from jira_cli.config import load_config
-from jira_cli.models import Issue
+from jira_cli.confluence_mcp import register as register_confluence_tools
+from jira_cli.models import Issue, IssueType, Status
 from jira_cli.quality import generate_quality_report
 
-mcp = FastMCP("Jira")
+__all__ = ["main", "mcp"]
+
+WRITING_GUIDANCE = (
+    "Jira issue descriptions and Confluence pages must be written in plain "
+    "English prose. Do not use markdown tables; Jira does not render them and "
+    "the Confluence converter leaves them as literal text. "
+    "Structure every issue description with these sections: "
+    "Context, Goal, Scope, Acceptance criteria."
+)
+
+_INSTANCE_METADATA_UNAVAILABLE = (
+    "The instance's ticket statuses and issue types could not be fetched at "
+    "startup; use get_transitions to discover valid statuses for an issue."
+)
+
+mcp = FastMCP("Jira", instructions=WRITING_GUIDANCE)
+
+
+def _dedup(names: list[str]) -> list[str]:
+    """Drop duplicate names while preserving order."""
+    return list(dict.fromkeys(names))
+
+
+def _format_statuses(statuses: list["Status"]) -> str:
+    """Format statuses grouped by category, one category per line."""
+    by_category: dict[str, list[str]] = {}
+    for status in statuses:
+        by_category.setdefault(status.category, []).append(status.name)
+    return "\n".join(
+        f"{category}: {', '.join(_dedup(names))}"
+        for category, names in by_category.items()
+    )
+
+
+def _format_issue_types(issue_types: list["IssueType"]) -> str:
+    """Format issue types with subtask types listed separately."""
+    regular = _dedup([t.name for t in issue_types if not t.subtask])
+    subtask = _dedup([t.name for t in issue_types if t.subtask])
+    text = ", ".join(regular)
+    if subtask:
+        text += f". Subtask types: {', '.join(subtask)}"
+    return text
+
+
+def build_instructions() -> str:
+    """Build server instructions including the instance's statuses and issue types."""
+    try:
+        with get_client() as client:
+            statuses = client.get_statuses()
+            issue_types = client.get_issue_types()
+    except (httpx.HTTPError, ValueError):
+        return f"{WRITING_GUIDANCE}\n\n{_INSTANCE_METADATA_UNAVAILABLE}"
+    return (
+        f"{WRITING_GUIDANCE}\n\n"
+        "Ticket statuses defined in this Jira instance, grouped by category; "
+        "pass the exact status name to transition_issue:\n"
+        f"{_format_statuses(statuses)}\n\n"
+        "Issue types defined in this instance; pass the exact name as "
+        f"issue_type to create_issue: {_format_issue_types(issue_types)}"
+    )
 
 
 def _issue_to_dict(issue: Issue, *, full: bool = False) -> dict[str, Any]:
@@ -36,6 +95,11 @@ def _issue_to_dict(issue: Issue, *, full: bool = False) -> dict[str, Any]:
                 "description": issue.description,
                 "created": issue.created.isoformat(),
                 "updated": issue.updated.isoformat(),
+                "due_date": issue.due_date.isoformat() if issue.due_date else None,
+                "labels": issue.labels,
+                "components": issue.components,
+                "fix_versions": issue.fix_versions,
+                "attachments": [a.model_dump(mode="json") for a in issue.attachments],
             }
         )
     return result
@@ -107,8 +171,16 @@ def create_issue(
     priority: str | None = None,
     labels: list[str] | None = None,
     parent: str | None = None,
+    reporter: str | None = None,
+    components: list[str] | None = None,
+    fix_versions: list[str] | None = None,
+    due_date: str | None = None,
 ) -> dict[str, str]:
     """Create a new issue or subtask.
+
+    Write the description in plain English prose without markdown tables
+    (Jira does not render them), structured into the sections
+    Context, Goal, Scope, Acceptance criteria.
 
     Args:
         project: Project key (e.g., "PROJ").
@@ -118,6 +190,10 @@ def create_issue(
         priority: Priority name (e.g., "High", "Medium", "Low").
         labels: List of labels.
         parent: Parent issue key for subtasks (e.g., "PROJ-123").
+        reporter: Reporter account ID (requires Modify Reporter permission).
+        components: Component names; must already exist in the project.
+        fix_versions: Fix version names; must already exist in the project.
+        due_date: Due date in YYYY-MM-DD format.
 
     Returns:
         Created issue key.
@@ -130,6 +206,10 @@ def create_issue(
         priority=priority,
         labels=labels,
         parent=parent,
+        reporter=reporter,
+        components=components,
+        fix_versions=fix_versions,
+        due_date=due_date,
     )
     with get_client() as client:
         issue_key = client.create_issue(params)
@@ -144,8 +224,16 @@ def update_issue(
     priority: str | None = None,
     labels: list[str] | None = None,
     assignee: str | None = None,
+    reporter: str | None = None,
+    components: list[str] | None = None,
+    fix_versions: list[str] | None = None,
+    due_date: str | None = None,
 ) -> dict[str, Any]:
     """Update an issue's fields.
+
+    Write the description in plain English prose without markdown tables
+    (Jira does not render them), structured into the sections
+    Context, Goal, Scope, Acceptance criteria.
 
     Args:
         issue_key: The issue key (e.g., "PROJ-123").
@@ -154,6 +242,10 @@ def update_issue(
         priority: New priority name.
         labels: New labels list.
         assignee: New assignee account ID.
+        reporter: New reporter account ID (requires Modify Reporter permission).
+        components: New component names; replaces the current list.
+        fix_versions: New fix version names; replaces the current list.
+        due_date: New due date in YYYY-MM-DD format.
 
     Returns:
         Success status.
@@ -164,10 +256,14 @@ def update_issue(
         priority=priority,
         labels=labels,
         assignee=assignee,
+        reporter=reporter,
+        components=components,
+        fix_versions=fix_versions,
+        due_date=due_date,
     )
     with get_client() as client:
-        client.update_issue(issue_key, params)
-        return {"success": True, "issue_key": issue_key}
+        updated = client.update_issue(issue_key, params)
+        return {"success": True, "updated": updated, "issue_key": issue_key}
 
 
 @mcp.tool()
@@ -376,8 +472,12 @@ def get_issue_quality_report(
         return generate_quality_report(issues)
 
 
+register_confluence_tools(mcp)
+
+
 def main() -> None:
     """Entry point for MCP server."""
+    mcp.instructions = build_instructions()
     mcp.run()
 
 

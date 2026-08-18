@@ -16,17 +16,21 @@ from jira_cli.display import build_comment_panel, build_issue_content, truncate
 __all__ = ["JiraShell"]
 
 if TYPE_CHECKING:
+    from types import ModuleType
+
     from jira_cli.client import JiraClient
     from jira_cli.models import Issue
 
-# Check if readline is available (not on Windows by default)
-HAS_READLINE = "readline" in sys.modules or sys.platform != "win32"
-if HAS_READLINE:
+# readline is unavailable on Windows by default. Bind a sentinel first so the
+# name is always defined, then import the module when the platform provides it.
+readline: ModuleType | None = None
+if "readline" in sys.modules or sys.platform != "win32":
     try:
-        import readline
+        import readline as _readline
     except ImportError:
-        HAS_READLINE = False
-        readline = None  # type: ignore[assignment]
+        pass
+    else:
+        readline = _readline
 
 console = Console()
 
@@ -57,6 +61,16 @@ _ARG_MAPPINGS: list[tuple[tuple[str, ...], str, bool]] = [
 ]
 
 
+def _coerce_arg_value(value: str, is_int: bool) -> str | int | None:
+    """Coerce a flag value, returning None when an int flag gets a non-integer."""
+    if not is_int:
+        return value
+    try:
+        return int(value)
+    except ValueError:
+        return None
+
+
 def _parse_shell_args(arg: str) -> dict[str, str | int | None]:
     """Parse shell command arguments."""
     result: dict[str, str | int | None] = {}
@@ -70,7 +84,9 @@ def _parse_shell_args(arg: str) -> dict[str, str | int | None]:
         matched = False
         for flags, key, is_int in _ARG_MAPPINGS:
             if args[i] in flags and i + 1 < len(args):
-                result[key] = int(args[i + 1]) if is_int else args[i + 1]
+                value = _coerce_arg_value(args[i + 1], is_int)
+                if value is not None:
+                    result[key] = value
                 i += 2
                 matched = True
                 break

@@ -1,6 +1,56 @@
 """Tests for Jira data models."""
 
-from jira_cli.models import Attachment, Comment, Issue, Transition
+from datetime import date
+
+from jira_cli.models import (
+    Attachment,
+    Comment,
+    Issue,
+    IssueType,
+    Status,
+    Transition,
+    _extract_text_from_adf,
+)
+
+
+def _paragraph(text: str) -> dict:
+    """Build an ADF paragraph node with a single text run."""
+    return {"type": "paragraph", "content": [{"type": "text", "text": text}]}
+
+
+def _doc(*blocks: dict) -> dict:
+    """Wrap block nodes in an ADF doc."""
+    return {"type": "doc", "version": 1, "content": list(blocks)}
+
+
+class TestExtractTextFromAdf:
+    """Tests for _extract_text_from_adf block handling."""
+
+    def test_none_returns_none(self) -> None:
+        """A missing ADF document yields None."""
+        assert _extract_text_from_adf(None) is None
+
+    def test_single_paragraph_has_no_trailing_newline(self) -> None:
+        """A single paragraph extracts to its text only."""
+        assert _extract_text_from_adf(_doc(_paragraph("First."))) == "First."
+
+    def test_blocks_separated_by_newline(self) -> None:
+        """Distinct block nodes are separated, not concatenated."""
+        adf = _doc(_paragraph("First."), _paragraph("Second."))
+        assert _extract_text_from_adf(adf) == "First.\nSecond."
+
+    def test_list_items_separated(self) -> None:
+        """Bullet list items each render on their own line."""
+        adf = _doc(
+            {
+                "type": "bulletList",
+                "content": [
+                    {"type": "listItem", "content": [_paragraph("one")]},
+                    {"type": "listItem", "content": [_paragraph("two")]},
+                ],
+            }
+        )
+        assert _extract_text_from_adf(adf) == "one\ntwo"
 
 
 class TestIssue:
@@ -63,6 +113,66 @@ class TestIssue:
         issue = Issue.from_api_response(sample_issue_response)
 
         assert issue.labels == []
+
+    def test_from_api_response_metadata_fields(
+        self, sample_issue_response: dict
+    ) -> None:
+        """Issue parses components, fix versions, and due date."""
+        issue = Issue.from_api_response(sample_issue_response)
+
+        assert issue.components == ["API", "UI"]
+        assert issue.fix_versions == ["1.2.0"]
+        assert issue.due_date == date(2024, 2, 1)
+
+    def test_from_api_response_no_metadata_fields(
+        self, sample_issue_response: dict
+    ) -> None:
+        """Issue handles missing components, fix versions, and due date."""
+        del sample_issue_response["fields"]["components"]
+        del sample_issue_response["fields"]["fixVersions"]
+        sample_issue_response["fields"]["duedate"] = None
+        issue = Issue.from_api_response(sample_issue_response)
+
+        assert issue.components == []
+        assert issue.fix_versions == []
+        assert issue.due_date is None
+
+
+class TestStatus:
+    """Tests for Status model."""
+
+    def test_from_api_response(self) -> None:
+        """Status parses name and category."""
+        status = Status.from_api_response(
+            {"name": "In Review", "statusCategory": {"name": "In Progress"}}
+        )
+
+        assert status.name == "In Review"
+        assert status.category == "In Progress"
+
+    def test_from_api_response_no_category(self) -> None:
+        """Status handles missing statusCategory."""
+        status = Status.from_api_response({"name": "Odd"})
+
+        assert status.name == "Odd"
+        assert status.category == ""
+
+
+class TestIssueType:
+    """Tests for IssueType model."""
+
+    def test_from_api_response(self) -> None:
+        """IssueType parses name and subtask flag."""
+        issue_type = IssueType.from_api_response({"name": "Story", "subtask": False})
+
+        assert issue_type.name == "Story"
+        assert issue_type.subtask is False
+
+    def test_from_api_response_subtask(self) -> None:
+        """IssueType handles subtask types and a missing flag."""
+        subtask = IssueType.from_api_response({"name": "Sub-task", "subtask": True})
+        assert subtask.subtask is True
+        assert IssueType.from_api_response({"name": "Odd"}).subtask is False
 
 
 class TestComment:

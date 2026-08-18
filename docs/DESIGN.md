@@ -17,7 +17,12 @@ jira-cli/
 │       ├── models.py       # Data models (Pydantic)
 │       ├── config.py       # Configuration management
 │       ├── mcp.py          # MCP server for Claude Desktop
-│       └── shell.py        # Interactive shell
+│       ├── shell.py        # Interactive shell
+│       ├── confluence_models.py   # Confluence data models
+│       ├── confluence_storage.py  # Markdown to storage format conversion
+│       ├── confluence_client.py   # Confluence API client
+│       ├── confluence_cli.py      # Confluence Typer CLI
+│       └── confluence_mcp.py      # Confluence MCP tools
 ├── tests/
 │   ├── __init__.py
 │   ├── test_cli.py
@@ -113,16 +118,26 @@ jira user list --project PROJ --query "john"
 
 ```python
 class Issue:
-    key: str              # e.g., "PROJ-123"
+    key: str                      # e.g., "PROJ-123"
     summary: str
     status: str
-    assignee: str | None
+    assignee: str | None          # display name
+    reporter: str | None          # display name
     project: str
     priority: str | None
     created: datetime
     updated: datetime
+    due_date: date | None
     description: str | None
+    attachments: list[Attachment]
+    labels: list[str]
+    components: list[str]         # component names
+    fix_versions: list[str]       # version names
 ```
+
+### Issue Field Writes
+
+`create_issue` and `update_issue` accept the same metadata fields. People fields (`assignee`, `reporter`) are sent as account IDs; setting the reporter requires the "Modify Reporter" project permission. `components` and `fix_versions` are lists of names that must already exist in the project; an update replaces the stored list. `due_date` is an ISO date (`YYYY-MM-DD`). Fields left as `None` are not sent.
 
 ### Comment
 
@@ -194,6 +209,8 @@ def hello():
 | Add comment | POST | `/rest/api/3/issue/{key}/comment` |
 | Get transitions | GET | `/rest/api/3/issue/{key}/transitions` |
 | Do transition | POST | `/rest/api/3/issue/{key}/transitions` |
+| List statuses | GET | `/rest/api/3/status` |
+| List issue types | GET | `/rest/api/3/issuetype` |
 | Search users | GET | `/rest/api/3/users/search` |
 
 ## Data Models
@@ -277,6 +294,12 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 | `get_users` | Search users |
 | `watch_issue` | Start watching an issue |
 | `unwatch_issue` | Stop watching an issue |
+
+## Confluence Support
+
+Confluence Cloud management is provided by a separate `confluence` CLI and
+matching MCP tools, reusing the same Atlassian credentials. See
+[CONFLUENCE.md](CONFLUENCE.md) for the full design.
 
 ## Future (v2+)
 

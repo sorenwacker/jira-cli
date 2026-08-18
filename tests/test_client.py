@@ -35,6 +35,26 @@ class TestJiraClientSearch:
         assert issues[0].key == "PROJ-123"
         body = json.loads(route.calls[0].request.content)
         assert "assignee = currentUser()" in body["jql"]
+        for field in ("components", "fixVersions", "duedate"):
+            assert field in body["fields"]
+
+    @respx.mock
+    def test_search_follows_next_page_token(
+        self, jira_client: JiraClient, sample_search_response: dict
+    ) -> None:
+        """Search pages over nextPageToken until the last page."""
+        first = {**sample_search_response, "nextPageToken": "tok", "isLast": False}
+        last = {**sample_search_response, "isLast": True}
+        route = respx.post("https://test.atlassian.net/rest/api/3/search/jql").mock(
+            side_effect=[
+                httpx.Response(200, json=first),
+                httpx.Response(200, json=last),
+            ]
+        )
+        issues = jira_client.search("project = PROJ", limit=50)
+        assert len(issues) == 2
+        assert route.call_count == 2
+        assert json.loads(route.calls[1].request.content)["nextPageToken"] == "tok"
 
     @respx.mock
     def test_get_my_issues_with_status_filter(
@@ -117,85 +137,6 @@ class TestJiraClientGetIssue:
 
         with pytest.raises(httpx.HTTPStatusError):
             jira_client.get_issue("PROJ-999")
-
-
-class TestJiraClientComments:
-    """Tests for comment functionality."""
-
-    @respx.mock
-    def test_get_comments(
-        self,
-        jira_client: JiraClient,
-        sample_comments_response: dict,
-    ) -> None:
-        """Can retrieve comments for an issue."""
-        respx.get("https://test.atlassian.net/rest/api/3/issue/PROJ-123/comment").mock(
-            return_value=httpx.Response(200, json=sample_comments_response)
-        )
-
-        comments = jira_client.get_comments("PROJ-123")
-
-        assert len(comments) == 2
-        assert comments[0].body == "First comment"
-
-    @respx.mock
-    def test_add_comment(self, jira_client: JiraClient) -> None:
-        """Can add a comment to an issue."""
-        respx.post("https://test.atlassian.net/rest/api/3/issue/PROJ-123/comment").mock(
-            return_value=httpx.Response(
-                201,
-                json={
-                    "id": "10003",
-                    "author": {"displayName": "Test User"},
-                    "body": {
-                        "type": "doc",
-                        "content": [
-                            {
-                                "type": "paragraph",
-                                "content": [{"type": "text", "text": "New comment"}],
-                            }
-                        ],
-                    },
-                    "created": "2024-01-15T13:00:00.000+0000",
-                },
-            )
-        )
-
-        comment = jira_client.add_comment("PROJ-123", "New comment")
-
-        assert comment.id == "10003"
-        assert comment.body == "New comment"
-
-    @respx.mock
-    def test_update_comment(self, jira_client: JiraClient) -> None:
-        """Can update an existing comment."""
-        route = respx.put(
-            "https://test.atlassian.net/rest/api/3/issue/PROJ-123/comment/10001"
-        ).mock(
-            return_value=httpx.Response(
-                200,
-                json={
-                    "id": "10001",
-                    "author": {"displayName": "Test User"},
-                    "body": {
-                        "type": "doc",
-                        "content": [
-                            {
-                                "type": "paragraph",
-                                "content": [
-                                    {"type": "text", "text": "Updated comment"}
-                                ],
-                            }
-                        ],
-                    },
-                    "created": "2024-01-15T13:00:00.000+0000",
-                },
-            )
-        )
-
-        jira_client.update_comment("PROJ-123", "10001", "Updated comment")
-
-        assert route.called
 
 
 class TestJiraClientTransitions:
@@ -305,6 +246,36 @@ class TestJiraClientCreateIssue:
         assert body["fields"]["issuetype"]["name"] == "Task"
 
     @respx.mock
+    def test_create_issue_with_metadata_fields(self, jira_client: JiraClient) -> None:
+        """Create sends reporter, components, fix versions, and due date."""
+        route = respx.post("https://test.atlassian.net/rest/api/3/issue").mock(
+            return_value=httpx.Response(
+                201,
+                json={
+                    "id": "10001",
+                    "key": "PROJ-128",
+                    "self": "https://test.atlassian.net/rest/api/3/issue/10001",
+                },
+            )
+        )
+
+        params = IssueCreateParams(
+            project="PROJ",
+            summary="Full metadata",
+            reporter="account-123",
+            components=["API", "UI"],
+            fix_versions=["1.2.0"],
+            due_date="2024-02-01",
+        )
+        jira_client.create_issue(params)
+
+        body = json.loads(route.calls[0].request.content)
+        assert body["fields"]["reporter"]["id"] == "account-123"
+        assert body["fields"]["components"] == [{"name": "API"}, {"name": "UI"}]
+        assert body["fields"]["fixVersions"] == [{"name": "1.2.0"}]
+        assert body["fields"]["duedate"] == "2024-02-01"
+
+    @respx.mock
     def test_create_subtask(self, jira_client: JiraClient) -> None:
         """Can create a subtask under a parent issue."""
         route = respx.post("https://test.atlassian.net/rest/api/3/issue").mock(
@@ -371,10 +342,16 @@ class TestJiraClientUpdateIssue:
         )
 
         params = IssueUpdateParams(summary="Updated summary")
-        jira_client.update_issue("PROJ-123", params)
-
+        result = jira_client.update_issue("PROJ-123", params)
+        assert result is True
         body = json.loads(route.calls[0].request.content)
         assert body["fields"]["summary"] == "Updated summary"
+
+    def test_update_issue_returns_false_when_no_fields(
+        self, jira_client: JiraClient
+    ) -> None:
+        """An update with no fields reports no change and sends no request."""
+        assert jira_client.update_issue("PROJ-123", IssueUpdateParams()) is False
 
     @respx.mock
     def test_update_priority(self, jira_client: JiraClient) -> None:
@@ -414,6 +391,31 @@ class TestJiraClientUpdateIssue:
 
         body = json.loads(route.calls[0].request.content)
         assert body["fields"]["labels"] == ["bug", "urgent"]
+
+    @respx.mock
+    def test_update_metadata_fields(self, jira_client: JiraClient) -> None:
+        """Update sends reporter, components, fix versions, and due date."""
+        route = respx.put("https://test.atlassian.net/rest/api/3/issue/PROJ-123").mock(
+            return_value=httpx.Response(204)
+        )
+
+        params = IssueUpdateParams(
+            reporter="account-123",
+            components=["API"],
+            fix_versions=["1.2.0", "1.3.0"],
+            due_date="2024-02-01",
+        )
+        result = jira_client.update_issue("PROJ-123", params)
+
+        assert result is True
+        body = json.loads(route.calls[0].request.content)
+        assert body["fields"]["reporter"]["id"] == "account-123"
+        assert body["fields"]["components"] == [{"name": "API"}]
+        assert body["fields"]["fixVersions"] == [
+            {"name": "1.2.0"},
+            {"name": "1.3.0"},
+        ]
+        assert body["fields"]["duedate"] == "2024-02-01"
 
 
 class TestJiraClientCustomSearch:

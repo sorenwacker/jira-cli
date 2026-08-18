@@ -3,7 +3,8 @@
 import pytest
 
 from jira_cli.client import JiraClient
-from jira_cli.config import JiraConfig
+from jira_cli.config import ConfluenceConfig, JiraConfig
+from jira_cli.confluence_client import ConfluenceClient
 
 
 @pytest.fixture
@@ -20,6 +21,93 @@ def jira_config() -> JiraConfig:
 def jira_client(jira_config: JiraConfig) -> JiraClient:
     """Jira client configured for testing."""
     return JiraClient(config=jira_config)
+
+
+@pytest.fixture
+def confluence_config() -> ConfluenceConfig:
+    """Sample Confluence configuration for testing."""
+    return ConfluenceConfig(
+        url="https://test.atlassian.net",
+        email="test@example.com",
+        api_token="test-token-123",
+    )
+
+
+@pytest.fixture
+def confluence_client(confluence_config: ConfluenceConfig) -> ConfluenceClient:
+    """Confluence client configured for testing."""
+    return ConfluenceClient(config=confluence_config)
+
+
+@pytest.fixture
+def sample_spaces_response() -> dict:
+    """Sample Confluence API response for listing spaces."""
+    return {
+        "results": [
+            {
+                "id": "111",
+                "key": "DEV",
+                "name": "Development",
+                "type": "global",
+                "status": "current",
+            },
+            {
+                "id": "222",
+                "key": "DOCS",
+                "name": "Documentation",
+                "type": "global",
+                "status": "current",
+            },
+        ],
+        "_links": {},
+    }
+
+
+@pytest.fixture
+def sample_page_response() -> dict:
+    """Sample Confluence API response for a single page."""
+    return {
+        "id": "12345",
+        "status": "current",
+        "title": "Test Page",
+        "spaceId": "111",
+        "version": {"number": 3},
+        "body": {
+            "storage": {
+                "representation": "storage",
+                "value": "<p>Page <strong>body</strong> text</p>",
+            }
+        },
+        "_links": {"webui": "/spaces/DEV/pages/12345/Test+Page"},
+    }
+
+
+@pytest.fixture
+def sample_confluence_search_response() -> dict:
+    """Sample Confluence API response for CQL search."""
+    return {
+        "results": [
+            {
+                "content": {
+                    "id": "12345",
+                    "type": "page",
+                    "status": "current",
+                    "title": "Test Page",
+                },
+                "url": "/spaces/DEV/pages/12345/Test+Page",
+            },
+            {
+                "content": {
+                    "id": "67890",
+                    "type": "page",
+                    "status": "current",
+                    "title": "Another Page",
+                },
+                "url": "/spaces/DEV/pages/67890/Another+Page",
+            },
+        ],
+        "_links": {},
+    }
 
 
 @pytest.fixture
@@ -78,6 +166,9 @@ def sample_issue_response(sample_attachment_response: list[dict]) -> dict:
             },
             "attachment": sample_attachment_response,
             "labels": ["bug", "high-priority"],
+            "components": [{"name": "API"}, {"name": "UI"}],
+            "fixVersions": [{"name": "1.2.0"}],
+            "duedate": "2024-02-01",
         },
     }
 

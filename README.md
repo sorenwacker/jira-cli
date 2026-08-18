@@ -21,7 +21,7 @@ uv pip install -e .
 uv tool install git+https://github.com/sorenwacker/jira-cli.git
 ```
 
-This installs `jira` and `jira-mcp` commands globally.
+This installs `jira`, `jira-mcp`, and `confluence` commands globally.
 
 ## Configuration
 
@@ -107,13 +107,17 @@ Create issue:
 
 ```bash
 jira issue create PROJ "Issue summary" --type Bug --description "Details"
+jira issue create PROJ "Issue summary" --reporter 5b10ac8d... --components "API,UI" --fix-versions "1.2.0" --due-date 2026-09-01
 ```
 
 Edit issue:
 
 ```bash
 jira issue edit PROJ-123 --summary "New title" --priority High
+jira issue edit PROJ-123 --reporter 5b10ac8d... --components "API,UI" --fix-versions "1.2.0" --due-date 2026-09-01
 ```
+
+`--reporter` and `--assignee` take Jira account IDs (find them with `jira user list`). `--components` and `--fix-versions` take comma-separated names that must already exist in the project; setting them replaces the current value. `--due-date` takes a `YYYY-MM-DD` date. Setting the reporter requires the "Modify Reporter" project permission.
 
 Search with JQL:
 
@@ -153,26 +157,50 @@ jira issue watch PROJ-123
 jira issue unwatch PROJ-123
 ```
 
+## Confluence
+
+The `confluence` command manages Confluence Cloud pages using the same
+Atlassian credentials as `jira`. No extra configuration is needed if `jira`
+already works.
+
+```bash
+# Search content with CQL
+confluence search "text ~ 'roadmap'"
+
+# List spaces
+confluence space list
+
+# Read a page by ID
+confluence page 12345
+confluence page 12345 --raw          # raw storage-format XHTML
+
+# Create a page from markdown
+confluence create --space DEV --title "Notes" --body "# Heading"
+confluence create --space DEV --title "Notes" --file notes.md --parent 12345
+
+# Update a page
+confluence update 12345 --title "New title"
+confluence update 12345 --file notes.md
+```
+
+See [docs/CONFLUENCE.md](docs/CONFLUENCE.md) for details.
+
 ## MCP Server
 
 The CLI includes an MCP server for integration with Claude Desktop and Claude Code.
 
 ### Claude Code
 
-Add to `~/.claude/.mcp.json` for global access:
+Register the server at user scope so it is available in every directory:
 
-```json
-{
-  "mcpServers": {
-    "jira": {
-      "command": "uv",
-      "args": ["--directory", "/path/to/jira-cli", "run", "jira-mcp"]
-    }
-  }
-}
+```bash
+claude mcp add jira --scope user -- "$(command -v jira-mcp)"
 ```
 
-Or add to your project's `.mcp.json`:
+This requires the global install above. User scope stores the entry in
+`~/.claude.json`; verify it with `claude mcp list`.
+
+To share the server with a repository instead, add a project `.mcp.json`:
 
 ```json
 {
@@ -201,6 +229,12 @@ Configure `~/Library/Application Support/Claude/claude_desktop_config.json`:
 }
 ```
 
+### Writing Conventions
+
+The server instructs LLM clients how to write content, via the server instructions and the tool descriptions of `create_issue`, `update_issue`, `create_page`, and `update_page`. Jira issue descriptions and Confluence pages must be plain English prose without markdown tables: Jira does not render them, and the Confluence markdown converter leaves them as literal text. Issue descriptions must be structured into the sections Context, Goal, Scope, Acceptance criteria.
+
+At startup the server also fetches the ticket statuses and issue types defined in the configured Jira instance and lists them in the server instructions — statuses grouped by category for `transition_issue`, issue types (with the subtask types marked) for `create_issue`. If the fetch fails (for example the instance is unreachable), the instructions state that statuses and issue types could not be fetched and refer clients to `get_transitions`.
+
 ### Available Tools
 
 | Tool | Description |
@@ -220,6 +254,11 @@ Configure `~/Library/Application Support/Claude/claude_desktop_config.json`:
 | `unwatch_issue` | Stop watching an issue |
 | `delete_issue` | Delete an issue permanently |
 | `get_issue_quality_report` | Generate quality report with ratings (1-10) |
+| `confluence_search` | Search Confluence content with CQL |
+| `get_page` | Get a Confluence page by ID, including its body |
+| `list_spaces` | List Confluence spaces |
+| `create_page` | Create a Confluence page from markdown |
+| `update_page` | Update a Confluence page's title and/or body |
 
 ### Issue Quality Report
 
@@ -238,6 +277,11 @@ Example usage in Claude Code:
 ```
 Generate an issue quality report for project DAT
 ```
+
+## Documentation
+
+- [docs/DESIGN.md](docs/DESIGN.md) - architecture, data models, and API endpoints
+- [docs/CONFLUENCE.md](docs/CONFLUENCE.md) - Confluence support design and page format details
 
 ## Development
 

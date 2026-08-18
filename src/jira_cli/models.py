@@ -1,6 +1,6 @@
 """Data models for Jira entities."""
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 from pydantic import BaseModel
@@ -9,7 +9,9 @@ __all__ = [
     "Attachment",
     "Comment",
     "Issue",
+    "IssueType",
     "Project",
+    "Status",
     "Transition",
     "User",
 ]
@@ -69,9 +71,12 @@ class Issue(BaseModel):
     priority: str | None
     created: datetime
     updated: datetime
+    due_date: date | None = None
     description: str | None
     attachments: list[Attachment] = []
     labels: list[str] = []
+    components: list[str] = []
+    fix_versions: list[str] = []
 
     @classmethod
     def from_api_response(cls, data: dict[str, Any]) -> "Issue":
@@ -90,9 +95,12 @@ class Issue(BaseModel):
             priority=_get_nested_name(fields, "priority"),
             created=_parse_jira_datetime(fields["created"]),
             updated=_parse_jira_datetime(fields["updated"]),
+            due_date=fields.get("duedate"),
             description=_extract_text_from_adf(fields.get("description")),
             attachments=attachments,
             labels=fields.get("labels", []),
+            components=[c["name"] for c in fields.get("components", []) or []],
+            fix_versions=[v["name"] for v in fields.get("fixVersions", []) or []],
         )
 
 
@@ -114,6 +122,36 @@ class Comment(BaseModel):
             author=data["author"]["displayName"],
             body=body,
             created=_parse_jira_datetime(data["created"]),
+        )
+
+
+class IssueType(BaseModel):
+    """Represents an issue type defined in the Jira instance."""
+
+    name: str
+    subtask: bool
+
+    @classmethod
+    def from_api_response(cls, data: dict[str, Any]) -> "IssueType":
+        """Create an IssueType from Jira API response."""
+        return cls(
+            name=data["name"],
+            subtask=data.get("subtask", False),
+        )
+
+
+class Status(BaseModel):
+    """Represents a ticket status defined in the Jira instance."""
+
+    name: str
+    category: str
+
+    @classmethod
+    def from_api_response(cls, data: dict[str, Any]) -> "Status":
+        """Create a Status from Jira API response."""
+        return cls(
+            name=data["name"],
+            category=data.get("statusCategory", {}).get("name", ""),
         )
 
 
@@ -176,13 +214,38 @@ class User(BaseModel):
         )
 
 
+_ADF_BLOCK_TYPES = frozenset(
+    {
+        "paragraph",
+        "heading",
+        "blockquote",
+        "codeBlock",
+        "bulletList",
+        "orderedList",
+        "listItem",
+        "rule",
+        "panel",
+    }
+)
+
+
 def _extract_adf_node_text(node: dict[str, Any]) -> str:
-    """Recursively extract text from a single ADF node."""
+    """Recursively extract text from a single ADF node.
+
+    Block-level children are separated by a newline so distinct paragraphs and
+    list items do not run together, mirroring the Confluence renderer.
+    """
     if node.get("type") == "text":
         text = node.get("text", "")
         return str(text) if text else ""
     content: list[dict[str, Any]] = node.get("content", [])
-    return "".join(_extract_adf_node_text(child) for child in content)
+    parts: list[str] = []
+    for child in content:
+        child_text = _extract_adf_node_text(child)
+        if child.get("type") in _ADF_BLOCK_TYPES and not child_text.endswith("\n"):
+            child_text += "\n"
+        parts.append(child_text)
+    return "".join(parts)
 
 
 def _extract_text_from_adf(adf: dict[str, Any] | None) -> str | None:
@@ -190,4 +253,4 @@ def _extract_text_from_adf(adf: dict[str, Any] | None) -> str | None:
     if adf is None:
         return None
     text = _extract_adf_node_text(adf)
-    return text or None
+    return text.strip() or None
