@@ -50,6 +50,9 @@ def build_issue_content(
         ("Assignee", issue.assignee or "Unassigned"),
         ("Reporter", issue.reporter or "Unknown"),
         ("Project", issue.project),
+        ("Components", ", ".join(issue.components) or "-"),
+        ("Fix versions", ", ".join(issue.fix_versions) or "-"),
+        ("Due date", issue.due_date.isoformat() if issue.due_date else "-"),
         ("Created", issue.created.strftime("%Y-%m-%d %H:%M")),
         ("Updated", issue.updated.strftime("%Y-%m-%d %H:%M")),
     ]

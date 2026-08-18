@@ -44,7 +44,10 @@ def _issue_to_dict(issue: Issue, *, full: bool = False) -> dict[str, Any]:
                 "description": issue.description,
                 "created": issue.created.isoformat(),
                 "updated": issue.updated.isoformat(),
+                "due_date": issue.due_date.isoformat() if issue.due_date else None,
                 "labels": issue.labels,
+                "components": issue.components,
+                "fix_versions": issue.fix_versions,
                 "attachments": [a.model_dump(mode="json") for a in issue.attachments],
             }
         )
@@ -117,6 +120,10 @@ def create_issue(
     priority: str | None = None,
     labels: list[str] | None = None,
     parent: str | None = None,
+    reporter: str | None = None,
+    components: list[str] | None = None,
+    fix_versions: list[str] | None = None,
+    due_date: str | None = None,
 ) -> dict[str, str]:
     """Create a new issue or subtask.
 
@@ -132,6 +139,10 @@ def create_issue(
         priority: Priority name (e.g., "High", "Medium", "Low").
         labels: List of labels.
         parent: Parent issue key for subtasks (e.g., "PROJ-123").
+        reporter: Reporter account ID (requires Modify Reporter permission).
+        components: Component names; must already exist in the project.
+        fix_versions: Fix version names; must already exist in the project.
+        due_date: Due date in YYYY-MM-DD format.
 
     Returns:
         Created issue key.
@@ -144,6 +155,10 @@ def create_issue(
         priority=priority,
         labels=labels,
         parent=parent,
+        reporter=reporter,
+        components=components,
+        fix_versions=fix_versions,
+        due_date=due_date,
     )
     with get_client() as client:
         issue_key = client.create_issue(params)
@@ -158,6 +173,10 @@ def update_issue(
     priority: str | None = None,
     labels: list[str] | None = None,
     assignee: str | None = None,
+    reporter: str | None = None,
+    components: list[str] | None = None,
+    fix_versions: list[str] | None = None,
+    due_date: str | None = None,
 ) -> dict[str, Any]:
     """Update an issue's fields.
 
@@ -172,6 +191,10 @@ def update_issue(
         priority: New priority name.
         labels: New labels list.
         assignee: New assignee account ID.
+        reporter: New reporter account ID (requires Modify Reporter permission).
+        components: New component names; replaces the current list.
+        fix_versions: New fix version names; replaces the current list.
+        due_date: New due date in YYYY-MM-DD format.
 
     Returns:
         Success status.
@@ -182,6 +205,10 @@ def update_issue(
         priority=priority,
         labels=labels,
         assignee=assignee,
+        reporter=reporter,
+        components=components,
+        fix_versions=fix_versions,
+        due_date=due_date,
     )
     with get_client() as client:
         updated = client.update_issue(issue_key, params)

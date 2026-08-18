@@ -1,5 +1,7 @@
 """Tests for Jira data models."""
 
+from datetime import date
+
 from jira_cli.models import (
     Attachment,
     Comment,
@@ -109,6 +111,29 @@ class TestIssue:
         issue = Issue.from_api_response(sample_issue_response)
 
         assert issue.labels == []
+
+    def test_from_api_response_metadata_fields(
+        self, sample_issue_response: dict
+    ) -> None:
+        """Issue parses components, fix versions, and due date."""
+        issue = Issue.from_api_response(sample_issue_response)
+
+        assert issue.components == ["API", "UI"]
+        assert issue.fix_versions == ["1.2.0"]
+        assert issue.due_date == date(2024, 2, 1)
+
+    def test_from_api_response_no_metadata_fields(
+        self, sample_issue_response: dict
+    ) -> None:
+        """Issue handles missing components, fix versions, and due date."""
+        del sample_issue_response["fields"]["components"]
+        del sample_issue_response["fields"]["fixVersions"]
+        sample_issue_response["fields"]["duedate"] = None
+        issue = Issue.from_api_response(sample_issue_response)
+
+        assert issue.components == []
+        assert issue.fix_versions == []
+        assert issue.due_date is None
 
 
 class TestComment:

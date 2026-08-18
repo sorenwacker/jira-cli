@@ -60,11 +60,11 @@ issue_app.add_typer(comment_app, name="comment")
 console = Console()
 
 
-def _parse_labels(labels: str | None) -> list[str] | None:
-    """Parse comma-separated labels string into list."""
-    if not labels:
+def _parse_csv_list(value: str | None) -> list[str] | None:
+    """Parse a comma-separated string into a list of stripped items."""
+    if not value:
         return None
-    return [label.strip() for label in labels.split(",")]
+    return [item.strip() for item in value.split(",")]
 
 
 def _create_issue_table(issues: list["Issue"], title: str) -> Table:
@@ -226,6 +226,10 @@ def issue_create(
     description: str | None = typer.Option(None, "--description", "-d"),
     priority: str | None = typer.Option(None, "--priority", "-p"),
     labels: str | None = typer.Option(None, "--labels", "-l", help="CSV labels"),
+    reporter: str | None = typer.Option(None, "--reporter", help="Account ID"),
+    components: str | None = typer.Option(None, "--components", help="CSV names"),
+    fix_versions: str | None = typer.Option(None, "--fix-versions", help="CSV names"),
+    due_date: str | None = typer.Option(None, "--due-date", help="YYYY-MM-DD"),
 ) -> None:
     """Create a new issue."""
     params = IssueCreateParams(
@@ -234,7 +238,11 @@ def issue_create(
         issue_type=issue_type,
         description=description,
         priority=priority,
-        labels=_parse_labels(labels),
+        labels=_parse_csv_list(labels),
+        reporter=reporter,
+        components=_parse_csv_list(components),
+        fix_versions=_parse_csv_list(fix_versions),
+        due_date=due_date,
     )
     with get_client() as client:
         issue_key = client.create_issue(params)
@@ -274,14 +282,22 @@ def issue_edit(
     priority: str | None = typer.Option(None, "--priority", "-p"),
     labels: str | None = typer.Option(None, "--labels", "-l"),
     assignee: str | None = typer.Option(None, "--assignee", "-a"),
+    reporter: str | None = typer.Option(None, "--reporter", help="Account ID"),
+    components: str | None = typer.Option(None, "--components", help="CSV names"),
+    fix_versions: str | None = typer.Option(None, "--fix-versions", help="CSV names"),
+    due_date: str | None = typer.Option(None, "--due-date", help="YYYY-MM-DD"),
 ) -> None:
     """Edit issue fields."""
     params = IssueUpdateParams(
         summary=summary,
         description=description,
         priority=priority,
-        labels=_parse_labels(labels),
+        labels=_parse_csv_list(labels),
         assignee=assignee,
+        reporter=reporter,
+        components=_parse_csv_list(components),
+        fix_versions=_parse_csv_list(fix_versions),
+        due_date=due_date,
     )
     with get_client() as client:
         changed = client.update_issue(issue_key, params)

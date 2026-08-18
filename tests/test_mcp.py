@@ -1,6 +1,6 @@
 """Tests for MCP server tools."""
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from unittest.mock import MagicMock, patch
 
 from jira_cli.client import IssueCreateParams, IssueUpdateParams, UserSearchParams
@@ -31,6 +31,9 @@ def mock_issue() -> Issue:
         updated=datetime(2024, 1, 16, tzinfo=UTC),
         description="Test description",
         labels=["bug", "urgent"],
+        components=["API"],
+        fix_versions=["1.2.0"],
+        due_date=date(2024, 2, 1),
     )
 
 
@@ -103,6 +106,16 @@ class TestGetIssue:
         assert result["labels"] == ["bug", "urgent"]
         assert result["attachments"] == []
 
+    def test_get_issue_includes_metadata_fields(self) -> None:
+        """The full issue dict carries components, fix versions, and due date."""
+        from jira_cli.mcp import _issue_to_dict
+
+        result = _issue_to_dict(mock_issue(), full=True)
+
+        assert result["components"] == ["API"]
+        assert result["fix_versions"] == ["1.2.0"]
+        assert result["due_date"] == "2024-02-01"
+
 
 class TestSearchIssues:
     """Tests for search_issues tool."""
@@ -172,6 +185,31 @@ class TestCreateIssue:
         assert call_args.project == "PROJ"
         assert call_args.summary == "New issue"
 
+    def test_create_issue_with_metadata_fields(self) -> None:
+        """Reporter, components, fix versions, and due date reach the client."""
+        from jira_cli.mcp import create_issue
+
+        with patch("jira_cli.mcp.load_config", return_value=mock_config()):
+            with patch("jira_cli.mcp.JiraClient") as mock_client_class:
+                client = create_mock_client()
+                client.create_issue.return_value = "PROJ-124"
+                mock_client_class.return_value = client
+
+                create_issue(
+                    project="PROJ",
+                    summary="New issue",
+                    reporter="account-123",
+                    components=["API"],
+                    fix_versions=["1.2.0"],
+                    due_date="2024-02-01",
+                )
+
+        call_args = client.create_issue.call_args[0][0]
+        assert call_args.reporter == "account-123"
+        assert call_args.components == ["API"]
+        assert call_args.fix_versions == ["1.2.0"]
+        assert call_args.due_date == "2024-02-01"
+
     def test_create_subtask(self) -> None:
         """Can create a subtask."""
         from jira_cli.mcp import create_issue
@@ -213,6 +251,29 @@ class TestUpdateIssue:
         call_args = client.update_issue.call_args[0]
         assert call_args[0] == "PROJ-123"
         assert isinstance(call_args[1], IssueUpdateParams)
+
+    def test_update_issue_metadata_fields(self) -> None:
+        """Reporter, components, fix versions, and due date reach the client."""
+        from jira_cli.mcp import update_issue
+
+        with patch("jira_cli.mcp.load_config", return_value=mock_config()):
+            with patch("jira_cli.mcp.JiraClient") as mock_client_class:
+                client = create_mock_client()
+                mock_client_class.return_value = client
+
+                update_issue(
+                    "PROJ-123",
+                    reporter="account-123",
+                    components=["API"],
+                    fix_versions=["1.2.0"],
+                    due_date="2024-02-01",
+                )
+
+        params = client.update_issue.call_args[0][1]
+        assert params.reporter == "account-123"
+        assert params.components == ["API"]
+        assert params.fix_versions == ["1.2.0"]
+        assert params.due_date == "2024-02-01"
 
 
 class TestGetTransitions:

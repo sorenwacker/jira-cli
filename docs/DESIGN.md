@@ -118,16 +118,26 @@ jira user list --project PROJ --query "john"
 
 ```python
 class Issue:
-    key: str              # e.g., "PROJ-123"
+    key: str                      # e.g., "PROJ-123"
     summary: str
     status: str
-    assignee: str | None
+    assignee: str | None          # display name
+    reporter: str | None          # display name
     project: str
     priority: str | None
     created: datetime
     updated: datetime
+    due_date: date | None
     description: str | None
+    attachments: list[Attachment]
+    labels: list[str]
+    components: list[str]         # component names
+    fix_versions: list[str]       # version names
 ```
+
+### Issue Field Writes
+
+`create_issue` and `update_issue` accept the same metadata fields. People fields (`assignee`, `reporter`) are sent as account IDs; setting the reporter requires the "Modify Reporter" project permission. `components` and `fix_versions` are lists of names that must already exist in the project; an update replaces the stored list. `due_date` is an ISO date (`YYYY-MM-DD`). Fields left as `None` are not sent.
 
 ### Comment
 

@@ -29,6 +29,9 @@ ISSUE_FIELDS = [
     "attachment",
     "labels",
     "reporter",
+    "components",
+    "fixVersions",
+    "duedate",
 ]
 
 
@@ -255,6 +258,7 @@ class JiraClient:
             fields["labels"] = params.labels
         if params.assignee:
             fields["assignee"] = {"id": params.assignee}
+        fields.update(_build_metadata_fields(params))
         return fields
 
     def update_issue(self, issue_key: str, params: "IssueUpdateParams") -> bool:
@@ -290,6 +294,7 @@ class JiraClient:
             fields["labels"] = params.labels
         if params.assignee is not None:
             fields["assignee"] = {"id": params.assignee}
+        fields.update(_build_metadata_fields(params))
         return fields
 
     def search(self, jql: str, limit: int = 50) -> list[Issue]:
@@ -460,10 +465,14 @@ class IssueCreateParams:  # pylint: disable=too-many-instance-attributes
     labels: list[str] | None = None
     assignee: str | None = None
     parent: str | None = None
+    reporter: str | None = None
+    components: list[str] | None = None
+    fix_versions: list[str] | None = None
+    due_date: str | None = None
 
 
 @dataclass
-class IssueUpdateParams:
+class IssueUpdateParams:  # pylint: disable=too-many-instance-attributes
     """Parameters for updating an issue."""
 
     summary: str | None = None
@@ -471,6 +480,26 @@ class IssueUpdateParams:
     priority: str | None = None
     labels: list[str] | None = None
     assignee: str | None = None
+    reporter: str | None = None
+    components: list[str] | None = None
+    fix_versions: list[str] | None = None
+    due_date: str | None = None
+
+
+def _build_metadata_fields(
+    params: "IssueCreateParams | IssueUpdateParams",
+) -> dict[str, Any]:
+    """Build the metadata fields shared by issue creation and update."""
+    fields: dict[str, Any] = {}
+    if params.reporter is not None:
+        fields["reporter"] = {"id": params.reporter}
+    if params.components is not None:
+        fields["components"] = [{"name": c} for c in params.components]
+    if params.fix_versions is not None:
+        fields["fixVersions"] = [{"name": v} for v in params.fix_versions]
+    if params.due_date is not None:
+        fields["duedate"] = params.due_date
+    return fields
 
 
 @dataclass

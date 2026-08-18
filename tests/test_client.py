@@ -35,6 +35,8 @@ class TestJiraClientSearch:
         assert issues[0].key == "PROJ-123"
         body = json.loads(route.calls[0].request.content)
         assert "assignee = currentUser()" in body["jql"]
+        for field in ("components", "fixVersions", "duedate"):
+            assert field in body["fields"]
 
     @respx.mock
     def test_search_follows_next_page_token(
@@ -244,6 +246,36 @@ class TestJiraClientCreateIssue:
         assert body["fields"]["issuetype"]["name"] == "Task"
 
     @respx.mock
+    def test_create_issue_with_metadata_fields(self, jira_client: JiraClient) -> None:
+        """Create sends reporter, components, fix versions, and due date."""
+        route = respx.post("https://test.atlassian.net/rest/api/3/issue").mock(
+            return_value=httpx.Response(
+                201,
+                json={
+                    "id": "10001",
+                    "key": "PROJ-128",
+                    "self": "https://test.atlassian.net/rest/api/3/issue/10001",
+                },
+            )
+        )
+
+        params = IssueCreateParams(
+            project="PROJ",
+            summary="Full metadata",
+            reporter="account-123",
+            components=["API", "UI"],
+            fix_versions=["1.2.0"],
+            due_date="2024-02-01",
+        )
+        jira_client.create_issue(params)
+
+        body = json.loads(route.calls[0].request.content)
+        assert body["fields"]["reporter"]["id"] == "account-123"
+        assert body["fields"]["components"] == [{"name": "API"}, {"name": "UI"}]
+        assert body["fields"]["fixVersions"] == [{"name": "1.2.0"}]
+        assert body["fields"]["duedate"] == "2024-02-01"
+
+    @respx.mock
     def test_create_subtask(self, jira_client: JiraClient) -> None:
         """Can create a subtask under a parent issue."""
         route = respx.post("https://test.atlassian.net/rest/api/3/issue").mock(
@@ -359,6 +391,31 @@ class TestJiraClientUpdateIssue:
 
         body = json.loads(route.calls[0].request.content)
         assert body["fields"]["labels"] == ["bug", "urgent"]
+
+    @respx.mock
+    def test_update_metadata_fields(self, jira_client: JiraClient) -> None:
+        """Update sends reporter, components, fix versions, and due date."""
+        route = respx.put("https://test.atlassian.net/rest/api/3/issue/PROJ-123").mock(
+            return_value=httpx.Response(204)
+        )
+
+        params = IssueUpdateParams(
+            reporter="account-123",
+            components=["API"],
+            fix_versions=["1.2.0", "1.3.0"],
+            due_date="2024-02-01",
+        )
+        result = jira_client.update_issue("PROJ-123", params)
+
+        assert result is True
+        body = json.loads(route.calls[0].request.content)
+        assert body["fields"]["reporter"]["id"] == "account-123"
+        assert body["fields"]["components"] == [{"name": "API"}]
+        assert body["fields"]["fixVersions"] == [
+            {"name": "1.2.0"},
+            {"name": "1.3.0"},
+        ]
+        assert body["fields"]["duedate"] == "2024-02-01"
 
 
 class TestJiraClientCustomSearch:

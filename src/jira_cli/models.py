@@ -1,6 +1,6 @@
 """Data models for Jira entities."""
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 from pydantic import BaseModel
@@ -69,9 +69,12 @@ class Issue(BaseModel):
     priority: str | None
     created: datetime
     updated: datetime
+    due_date: date | None = None
     description: str | None
     attachments: list[Attachment] = []
     labels: list[str] = []
+    components: list[str] = []
+    fix_versions: list[str] = []
 
     @classmethod
     def from_api_response(cls, data: dict[str, Any]) -> "Issue":
@@ -90,9 +93,12 @@ class Issue(BaseModel):
             priority=_get_nested_name(fields, "priority"),
             created=_parse_jira_datetime(fields["created"]),
             updated=_parse_jira_datetime(fields["updated"]),
+            due_date=fields.get("duedate"),
             description=_extract_text_from_adf(fields.get("description")),
             attachments=attachments,
             labels=fields.get("labels", []),
+            components=[c["name"] for c in fields.get("components", []) or []],
+            fix_versions=[v["name"] for v in fields.get("fixVersions", []) or []],
         )
 
 

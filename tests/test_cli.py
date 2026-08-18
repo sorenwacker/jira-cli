@@ -311,6 +311,61 @@ class TestCreateSubtaskCommand:
         assert call_args.issue_type == "Technical Task"
 
 
+class TestIssueMetadataOptions:
+    """Tests for metadata options on 'jira issue create' and 'jira issue edit'."""
+
+    METADATA_ARGS = (
+        "--reporter",
+        "account-123",
+        "--components",
+        "API, UI",
+        "--fix-versions",
+        "1.2.0",
+        "--due-date",
+        "2024-02-01",
+    )
+
+    def test_create_with_metadata_options(self) -> None:
+        """Create passes reporter, components, fix versions, and due date."""
+        with patch("jira_cli.cli.load_config", return_value=mock_config()):
+            with patch("jira_cli.cli.JiraClient") as mock_client_class:
+                client = create_mock_client()
+                client.create_issue.return_value = "PROJ-124"
+                mock_client_class.return_value = client
+
+                result = runner.invoke(
+                    app,
+                    ["issue", "create", "PROJ", "New issue", *self.METADATA_ARGS],
+                )
+
+        assert result.exit_code == 0
+        call_args = client.create_issue.call_args[0][0]
+        assert call_args.reporter == "account-123"
+        assert call_args.components == ["API", "UI"]
+        assert call_args.fix_versions == ["1.2.0"]
+        assert call_args.due_date == "2024-02-01"
+
+    def test_edit_with_metadata_options(self) -> None:
+        """Edit passes reporter, components, fix versions, and due date."""
+        with patch("jira_cli.cli.load_config", return_value=mock_config()):
+            with patch("jira_cli.cli.JiraClient") as mock_client_class:
+                client = create_mock_client()
+                client.update_issue.return_value = True
+                mock_client_class.return_value = client
+
+                result = runner.invoke(
+                    app,
+                    ["issue", "edit", "PROJ-123", *self.METADATA_ARGS],
+                )
+
+        assert result.exit_code == 0
+        params = client.update_issue.call_args[0][1]
+        assert params.reporter == "account-123"
+        assert params.components == ["API", "UI"]
+        assert params.fix_versions == ["1.2.0"]
+        assert params.due_date == "2024-02-01"
+
+
 class TestMoveCommand:
     """Tests for 'jira issue move' command."""
 

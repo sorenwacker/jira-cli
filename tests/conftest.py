@@ -166,6 +166,9 @@ def sample_issue_response(sample_attachment_response: list[dict]) -> dict:
             },
             "attachment": sample_attachment_response,
             "labels": ["bug", "high-priority"],
+            "components": [{"name": "API"}, {"name": "UI"}],
+            "fixVersions": [{"name": "1.2.0"}],
+            "duedate": "2024-02-01",
         },
     }
 

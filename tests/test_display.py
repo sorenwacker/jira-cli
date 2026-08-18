@@ -1,6 +1,6 @@
 """Tests for display formatting utilities."""
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 from jira_cli.display import (
     build_comment_panel,
@@ -65,6 +65,31 @@ class TestBuildIssueContent:
         assert "To Do" in text
         assert "Alice" in text
         assert "Test description" in text
+
+    def test_issue_with_metadata_fields(self):
+        issue = Issue(
+            key="PROJ-1",
+            summary="Test issue",
+            status="To Do",
+            assignee="Alice",
+            reporter="Bob",
+            project="PROJ",
+            priority="High",
+            created=datetime(2024, 1, 15, tzinfo=UTC),
+            updated=datetime(2024, 1, 16, tzinfo=UTC),
+            due_date=date(2024, 2, 1),
+            description=None,
+            attachments=[],
+            labels=[],
+            components=["API", "UI"],
+            fix_versions=["1.2.0"],
+        )
+        content = build_issue_content(issue)
+        text = content.plain
+
+        assert "API, UI" in text
+        assert "1.2.0" in text
+        assert "2024-02-01" in text
 
     def test_issue_without_description(self):
         issue = Issue(

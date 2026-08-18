@@ -107,13 +107,17 @@ Create issue:
 
 ```bash
 jira issue create PROJ "Issue summary" --type Bug --description "Details"
+jira issue create PROJ "Issue summary" --reporter 5b10ac8d... --components "API,UI" --fix-versions "1.2.0" --due-date 2026-09-01
 ```
 
 Edit issue:
 
 ```bash
 jira issue edit PROJ-123 --summary "New title" --priority High
+jira issue edit PROJ-123 --reporter 5b10ac8d... --components "API,UI" --fix-versions "1.2.0" --due-date 2026-09-01
 ```
+
+`--reporter` and `--assignee` take Jira account IDs (find them with `jira user list`). `--components` and `--fix-versions` take comma-separated names that must already exist in the project; setting them replaces the current value. `--due-date` takes a `YYYY-MM-DD` date. Setting the reporter requires the "Modify Reporter" project permission.
 
 Search with JQL:
 
