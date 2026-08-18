@@ -472,3 +472,40 @@ class TestGetIssueQualityReport:
                 get_issue_quality_report(project="PROJ", limit=10)
 
         client.search.assert_called_with("project = PROJ", limit=10)
+
+
+class TestIssueWritingGuidance:
+    """The server tells LLM clients how Jira issue text must be written."""
+
+    REQUIRED_PHRASES = (
+        "plain English",
+        "markdown tables",
+        "Context",
+        "Goal",
+        "Scope",
+        "Acceptance criteria",
+    )
+
+    def test_server_instructions_state_writing_convention(self) -> None:
+        """Server-level instructions describe the issue writing convention."""
+        from jira_cli.mcp import mcp
+
+        assert mcp.instructions is not None
+        for phrase in self.REQUIRED_PHRASES:
+            assert phrase in mcp.instructions
+
+    def test_create_issue_description_states_writing_convention(self) -> None:
+        """create_issue tool description carries the convention."""
+        from jira_cli.mcp import create_issue
+
+        doc = create_issue.__doc__ or ""
+        for phrase in self.REQUIRED_PHRASES:
+            assert phrase in doc
+
+    def test_update_issue_description_states_writing_convention(self) -> None:
+        """update_issue tool description carries the convention."""
+        from jira_cli.mcp import update_issue
+
+        doc = update_issue.__doc__ or ""
+        for phrase in self.REQUIRED_PHRASES:
+            assert phrase in doc

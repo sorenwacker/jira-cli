@@ -17,7 +17,14 @@ from jira_cli.quality import generate_quality_report
 
 __all__ = ["main", "mcp"]
 
-mcp = FastMCP("Jira")
+ISSUE_WRITING_GUIDANCE = (
+    "Jira issue descriptions must be written in plain English prose. "
+    "Do not use markdown tables; Jira does not render them. "
+    "Structure every issue description with these sections: "
+    "Context, Goal, Scope, Acceptance criteria."
+)
+
+mcp = FastMCP("Jira", instructions=ISSUE_WRITING_GUIDANCE)
 
 
 def _issue_to_dict(issue: Issue, *, full: bool = False) -> dict[str, Any]:
@@ -113,6 +120,10 @@ def create_issue(
 ) -> dict[str, str]:
     """Create a new issue or subtask.
 
+    Write the description in plain English prose without markdown tables
+    (Jira does not render them), structured into the sections
+    Context, Goal, Scope, Acceptance criteria.
+
     Args:
         project: Project key (e.g., "PROJ").
         summary: Issue summary/title.
@@ -149,6 +160,10 @@ def update_issue(
     assignee: str | None = None,
 ) -> dict[str, Any]:
     """Update an issue's fields.
+
+    Write the description in plain English prose without markdown tables
+    (Jira does not render them), structured into the sections
+    Context, Goal, Scope, Acceptance criteria.
 
     Args:
         issue_key: The issue key (e.g., "PROJ-123").

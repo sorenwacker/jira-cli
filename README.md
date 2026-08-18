@@ -225,6 +225,10 @@ Configure `~/Library/Application Support/Claude/claude_desktop_config.json`:
 }
 ```
 
+### Issue Writing Convention
+
+The server instructs LLM clients how to write issue text, via the server instructions and the `create_issue`/`update_issue` tool descriptions: descriptions must be plain English prose, must not contain markdown tables (Jira does not render them), and must be structured into the sections Context, Goal, Scope, Acceptance criteria.
+
 ### Available Tools
 
 | Tool | Description |
