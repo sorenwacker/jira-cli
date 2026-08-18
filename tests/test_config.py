@@ -6,7 +6,13 @@ from unittest.mock import patch
 
 import pytest
 
-from jira_cli.config import JiraConfig, get_config_path, load_config, save_config
+from jira_cli.config import (
+    JiraConfig,
+    get_config_path,
+    load_config,
+    load_writing_guidance,
+    save_config,
+)
 
 
 class TestJiraConfig:
@@ -155,3 +161,36 @@ class TestGetConfigPath:
 
         assert path.name == "config.toml"
         assert "jira-cli" in str(path)
+
+
+class TestLoadWritingGuidance:
+    """Tests for the writing guidance override file."""
+
+    def test_returns_none_when_file_missing(self, tmp_path: Path) -> None:
+        """No guidance file means no override."""
+        assert load_writing_guidance(guidance_path=tmp_path / "guidance.md") is None
+
+    def test_returns_file_content(self, tmp_path: Path) -> None:
+        """The guidance file content is returned stripped."""
+        guidance_file = tmp_path / "guidance.md"
+        guidance_file.write_text("Write tickets as user stories.\n")
+
+        content = load_writing_guidance(guidance_path=guidance_file)
+
+        assert content == "Write tickets as user stories."
+
+    def test_empty_file_is_treated_as_absent(self, tmp_path: Path) -> None:
+        """An empty or whitespace-only file means no override."""
+        guidance_file = tmp_path / "guidance.md"
+        guidance_file.write_text("  \n")
+
+        assert load_writing_guidance(guidance_path=guidance_file) is None
+
+    def test_default_path_is_next_to_config(self) -> None:
+        """The default guidance path lives in the jira-cli config directory."""
+        from jira_cli.config import get_guidance_path
+
+        path = get_guidance_path()
+
+        assert path.name == "guidance.md"
+        assert path.parent == get_config_path().parent

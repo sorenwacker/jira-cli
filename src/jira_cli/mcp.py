@@ -11,14 +11,14 @@ from jira_cli.client import (
     JiraClient,
     UserSearchParams,
 )
-from jira_cli.config import load_config
+from jira_cli.config import load_config, load_writing_guidance
 from jira_cli.confluence_mcp import register as register_confluence_tools
 from jira_cli.models import Issue, IssueType, Status
 from jira_cli.quality import generate_quality_report
 
 __all__ = ["main", "mcp"]
 
-WRITING_GUIDANCE = (
+DEFAULT_WRITING_GUIDANCE = (
     "Jira issue descriptions and Confluence pages must be written in plain "
     "English prose. Do not use markdown tables; Jira does not render them and "
     "the Confluence converter leaves them as literal text. "
@@ -31,7 +31,7 @@ _INSTANCE_METADATA_UNAVAILABLE = (
     "startup; use get_transitions to discover valid statuses for an issue."
 )
 
-mcp = FastMCP("Jira", instructions=WRITING_GUIDANCE)
+mcp = FastMCP("Jira", instructions=DEFAULT_WRITING_GUIDANCE)
 
 
 def _dedup(names: list[str]) -> list[str]:
@@ -62,14 +62,15 @@ def _format_issue_types(issue_types: list["IssueType"]) -> str:
 
 def build_instructions() -> str:
     """Build server instructions including the instance's statuses and issue types."""
+    guidance = load_writing_guidance() or DEFAULT_WRITING_GUIDANCE
     try:
         with get_client() as client:
             statuses = client.get_statuses()
             issue_types = client.get_issue_types()
     except (httpx.HTTPError, ValueError):
-        return f"{WRITING_GUIDANCE}\n\n{_INSTANCE_METADATA_UNAVAILABLE}"
+        return f"{guidance}\n\n{_INSTANCE_METADATA_UNAVAILABLE}"
     return (
-        f"{WRITING_GUIDANCE}\n\n"
+        f"{guidance}\n\n"
         "Ticket statuses defined in this Jira instance, grouped by category; "
         "pass the exact status name to transition_issue:\n"
         f"{_format_statuses(statuses)}\n\n"
@@ -178,9 +179,8 @@ def create_issue(
 ) -> dict[str, str]:
     """Create a new issue or subtask.
 
-    Write the description in plain English prose without markdown tables
-    (Jira does not render them), structured into the sections
-    Context, Goal, Scope, Acceptance criteria.
+    Write the description following the writing conventions stated in the
+    server instructions. Jira never renders markdown tables.
 
     Args:
         project: Project key (e.g., "PROJ").
@@ -231,9 +231,8 @@ def update_issue(
 ) -> dict[str, Any]:
     """Update an issue's fields.
 
-    Write the description in plain English prose without markdown tables
-    (Jira does not render them), structured into the sections
-    Context, Goal, Scope, Acceptance criteria.
+    Write the description following the writing conventions stated in the
+    server instructions. Jira never renders markdown tables.
 
     Args:
         issue_key: The issue key (e.g., "PROJ-123").
