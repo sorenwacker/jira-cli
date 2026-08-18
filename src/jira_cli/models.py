@@ -9,6 +9,7 @@ __all__ = [
     "Attachment",
     "Comment",
     "Issue",
+    "IssueType",
     "Project",
     "Status",
     "Transition",
@@ -121,6 +122,21 @@ class Comment(BaseModel):
             author=data["author"]["displayName"],
             body=body,
             created=_parse_jira_datetime(data["created"]),
+        )
+
+
+class IssueType(BaseModel):
+    """Represents an issue type defined in the Jira instance."""
+
+    name: str
+    subtask: bool
+
+    @classmethod
+    def from_api_response(cls, data: dict[str, Any]) -> "IssueType":
+        """Create an IssueType from Jira API response."""
+        return cls(
+            name=data["name"],
+            subtask=data.get("subtask", False),
         )
 
 

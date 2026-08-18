@@ -104,6 +104,9 @@ def create_page(
 ) -> dict[str, Any]:
     """Create a Confluence page from markdown.
 
+    Write the body in plain English prose. Do not use markdown tables;
+    the converter does not support them and leaves them as literal text.
+
     Args:
         space_key: The space key the page belongs to (e.g., "DEV").
         title: The page title.
@@ -126,6 +129,9 @@ def update_page(
     body: str | None = None,
 ) -> dict[str, Any]:
     """Update a Confluence page's title and/or body.
+
+    Write the body in plain English prose. Do not use markdown tables;
+    the converter does not support them and leaves them as literal text.
 
     Args:
         page_id: The numeric page ID.

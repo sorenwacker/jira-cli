@@ -6,6 +6,7 @@ from jira_cli.models import (
     Attachment,
     Comment,
     Issue,
+    IssueType,
     Status,
     Transition,
     _extract_text_from_adf,
@@ -155,6 +156,23 @@ class TestStatus:
 
         assert status.name == "Odd"
         assert status.category == ""
+
+
+class TestIssueType:
+    """Tests for IssueType model."""
+
+    def test_from_api_response(self) -> None:
+        """IssueType parses name and subtask flag."""
+        issue_type = IssueType.from_api_response({"name": "Story", "subtask": False})
+
+        assert issue_type.name == "Story"
+        assert issue_type.subtask is False
+
+    def test_from_api_response_subtask(self) -> None:
+        """IssueType handles subtask types and a missing flag."""
+        subtask = IssueType.from_api_response({"name": "Sub-task", "subtask": True})
+        assert subtask.subtask is True
+        assert IssueType.from_api_response({"name": "Odd"}).subtask is False
 
 
 class TestComment:

@@ -13,45 +13,68 @@ from jira_cli.client import (
 )
 from jira_cli.config import load_config
 from jira_cli.confluence_mcp import register as register_confluence_tools
-from jira_cli.models import Issue
+from jira_cli.models import Issue, IssueType, Status
 from jira_cli.quality import generate_quality_report
 
 __all__ = ["main", "mcp"]
 
-ISSUE_WRITING_GUIDANCE = (
-    "Jira issue descriptions must be written in plain English prose. "
-    "Do not use markdown tables; Jira does not render them. "
+WRITING_GUIDANCE = (
+    "Jira issue descriptions and Confluence pages must be written in plain "
+    "English prose. Do not use markdown tables; Jira does not render them and "
+    "the Confluence converter leaves them as literal text. "
     "Structure every issue description with these sections: "
     "Context, Goal, Scope, Acceptance criteria."
 )
 
-_STATUSES_UNAVAILABLE = (
-    "The instance's ticket statuses could not be fetched at startup; "
-    "use get_transitions to discover valid statuses for an issue."
+_INSTANCE_METADATA_UNAVAILABLE = (
+    "The instance's ticket statuses and issue types could not be fetched at "
+    "startup; use get_transitions to discover valid statuses for an issue."
 )
 
-mcp = FastMCP("Jira", instructions=ISSUE_WRITING_GUIDANCE)
+mcp = FastMCP("Jira", instructions=WRITING_GUIDANCE)
+
+
+def _dedup(names: list[str]) -> list[str]:
+    """Drop duplicate names while preserving order."""
+    return list(dict.fromkeys(names))
+
+
+def _format_statuses(statuses: list["Status"]) -> str:
+    """Format statuses grouped by category, one category per line."""
+    by_category: dict[str, list[str]] = {}
+    for status in statuses:
+        by_category.setdefault(status.category, []).append(status.name)
+    return "\n".join(
+        f"{category}: {', '.join(_dedup(names))}"
+        for category, names in by_category.items()
+    )
+
+
+def _format_issue_types(issue_types: list["IssueType"]) -> str:
+    """Format issue types with subtask types listed separately."""
+    regular = _dedup([t.name for t in issue_types if not t.subtask])
+    subtask = _dedup([t.name for t in issue_types if t.subtask])
+    text = ", ".join(regular)
+    if subtask:
+        text += f". Subtask types: {', '.join(subtask)}"
+    return text
 
 
 def build_instructions() -> str:
-    """Build server instructions including the instance's ticket statuses."""
+    """Build server instructions including the instance's statuses and issue types."""
     try:
         with get_client() as client:
             statuses = client.get_statuses()
+            issue_types = client.get_issue_types()
     except (httpx.HTTPError, ValueError):
-        return f"{ISSUE_WRITING_GUIDANCE}\n\n{_STATUSES_UNAVAILABLE}"
-    by_category: dict[str, list[str]] = {}
-    for status in statuses:
-        names = by_category.setdefault(status.category, [])
-        if status.name not in names:
-            names.append(status.name)
-    lines = [
-        f"{category}: {', '.join(names)}" for category, names in by_category.items()
-    ]
+        return f"{WRITING_GUIDANCE}\n\n{_INSTANCE_METADATA_UNAVAILABLE}"
     return (
-        f"{ISSUE_WRITING_GUIDANCE}\n\n"
+        f"{WRITING_GUIDANCE}\n\n"
         "Ticket statuses defined in this Jira instance, grouped by category; "
-        "pass the exact status name to transition_issue:\n" + "\n".join(lines)
+        "pass the exact status name to transition_issue:\n"
+        f"{_format_statuses(statuses)}\n\n"
+        "Issue types defined in this instance; pass the exact name as "
+        f"issue_type to create_issue: {_format_issue_types(issue_types)}"
     )
 
 

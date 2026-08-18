@@ -229,11 +229,11 @@ Configure `~/Library/Application Support/Claude/claude_desktop_config.json`:
 }
 ```
 
-### Issue Writing Convention
+### Writing Conventions
 
-The server instructs LLM clients how to write issue text, via the server instructions and the `create_issue`/`update_issue` tool descriptions: descriptions must be plain English prose, must not contain markdown tables (Jira does not render them), and must be structured into the sections Context, Goal, Scope, Acceptance criteria.
+The server instructs LLM clients how to write content, via the server instructions and the tool descriptions of `create_issue`, `update_issue`, `create_page`, and `update_page`. Jira issue descriptions and Confluence pages must be plain English prose without markdown tables: Jira does not render them, and the Confluence markdown converter leaves them as literal text. Issue descriptions must be structured into the sections Context, Goal, Scope, Acceptance criteria.
 
-At startup the server also fetches the ticket statuses defined in the configured Jira instance and lists them in the server instructions, grouped by status category, so clients pass exact status names to `transition_issue`. If the fetch fails (for example the instance is unreachable), the instructions state that statuses could not be fetched and refer clients to `get_transitions`.
+At startup the server also fetches the ticket statuses and issue types defined in the configured Jira instance and lists them in the server instructions — statuses grouped by category for `transition_issue`, issue types (with the subtask types marked) for `create_issue`. If the fetch fails (for example the instance is unreachable), the instructions state that statuses and issue types could not be fetched and refer clients to `get_transitions`.
 
 ### Available Tools
 
@@ -277,6 +277,11 @@ Example usage in Claude Code:
 ```
 Generate an issue quality report for project DAT
 ```
+
+## Documentation
+
+- [docs/DESIGN.md](docs/DESIGN.md) - architecture, data models, and API endpoints
+- [docs/CONFLUENCE.md](docs/CONFLUENCE.md) - Confluence support design and page format details
 
 ## Development
 

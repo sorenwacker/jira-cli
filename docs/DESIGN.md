@@ -210,6 +210,7 @@ def hello():
 | Get transitions | GET | `/rest/api/3/issue/{key}/transitions` |
 | Do transition | POST | `/rest/api/3/issue/{key}/transitions` |
 | List statuses | GET | `/rest/api/3/status` |
+| List issue types | GET | `/rest/api/3/issuetype` |
 | Search users | GET | `/rest/api/3/users/search` |
 
 ## Data Models
