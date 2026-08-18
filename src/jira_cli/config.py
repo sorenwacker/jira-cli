@@ -11,8 +11,10 @@ __all__ = [
     "ConfluenceConfig",
     "JiraConfig",
     "get_config_path",
+    "get_guidance_path",
     "load_config",
     "load_confluence_config",
+    "load_writing_guidance",
     "save_config",
 ]
 
@@ -43,6 +45,28 @@ def get_config_path() -> Path:
     """Get the default configuration file path."""
     config_dir = Path.home() / ".config" / "jira-cli"
     return config_dir / "config.toml"
+
+
+def get_guidance_path() -> Path:
+    """Get the default writing guidance file path."""
+    return get_config_path().parent / "guidance.md"
+
+
+def load_writing_guidance(guidance_path: Path | None = None) -> str | None:
+    """Load the user's writing guidance override, if configured.
+
+    Args:
+        guidance_path: Path to the guidance file. Defaults to
+            ~/.config/jira-cli/guidance.md
+
+    Returns:
+        The stripped file content, or None if the file is missing or empty.
+    """
+    if guidance_path is None:
+        guidance_path = get_guidance_path()
+    if not guidance_path.exists():
+        return None
+    return guidance_path.read_text().strip() or None
 
 
 def _load_file_config(config_path: Path) -> dict[str, Any]:

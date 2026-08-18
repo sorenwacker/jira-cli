@@ -231,7 +231,9 @@ Configure `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
 ### Writing Conventions
 
-The server instructs LLM clients how to write content, via the server instructions and the tool descriptions of `create_issue`, `update_issue`, `create_page`, and `update_page`. Jira issue descriptions and Confluence pages must be plain English prose without markdown tables: Jira does not render them, and the Confluence markdown converter leaves them as literal text. Issue descriptions must be structured into the sections Context, Goal, Scope, Acceptance criteria.
+The server instructs LLM clients how to write content via its server instructions; the tool descriptions of `create_issue`, `update_issue`, `create_page`, and `update_page` refer clients to them. The default convention: Jira issue descriptions and Confluence pages must be plain English prose without markdown tables (Jira does not render them, and the Confluence markdown converter leaves them as literal text), and issue descriptions must be structured into the sections Context, Goal, Scope, Acceptance criteria.
+
+To use your own convention, create `~/.config/jira-cli/guidance.md`; its content replaces the default guidance in the server instructions. Delete the file to return to the default. An empty file is treated as absent.
 
 At startup the server also fetches the ticket statuses and issue types defined in the configured Jira instance and lists them in the server instructions — statuses grouped by category for `transition_issue`, issue types (with the subtask types marked) for `create_issue`. If the fetch fails (for example the instance is unreachable), the instructions state that statuses and issue types could not be fetched and refer clients to `get_transitions`.
 
