@@ -209,6 +209,7 @@ def hello():
 | Add comment | POST | `/rest/api/3/issue/{key}/comment` |
 | Get transitions | GET | `/rest/api/3/issue/{key}/transitions` |
 | Do transition | POST | `/rest/api/3/issue/{key}/transitions` |
+| List statuses | GET | `/rest/api/3/status` |
 | Search users | GET | `/rest/api/3/users/search` |
 
 ## Data Models

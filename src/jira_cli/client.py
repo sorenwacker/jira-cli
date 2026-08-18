@@ -8,7 +8,7 @@ import httpx
 
 from jira_cli.adf import markdown_to_adf
 from jira_cli.config import JiraConfig
-from jira_cli.models import Comment, Issue, Project, Transition, User
+from jira_cli.models import Comment, Issue, Project, Status, Transition, User
 
 __all__ = [
     "IssueCreateParams",
@@ -190,6 +190,16 @@ class JiraClient:
         response.raise_for_status()
         data = response.json()
         return [Transition.from_api_response(t) for t in data["transitions"]]
+
+    def get_statuses(self) -> list[Status]:
+        """Get all ticket statuses defined in the Jira instance.
+
+        Returns:
+            List of Status objects.
+        """
+        response = self._client.get("/rest/api/3/status")
+        response.raise_for_status()
+        return [Status.from_api_response(s) for s in response.json()]
 
     def transition_issue(self, issue_key: str, transition_name: str) -> bool:
         """Transition an issue to a new status.

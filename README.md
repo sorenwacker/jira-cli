@@ -233,6 +233,8 @@ Configure `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
 The server instructs LLM clients how to write issue text, via the server instructions and the `create_issue`/`update_issue` tool descriptions: descriptions must be plain English prose, must not contain markdown tables (Jira does not render them), and must be structured into the sections Context, Goal, Scope, Acceptance criteria.
 
+At startup the server also fetches the ticket statuses defined in the configured Jira instance and lists them in the server instructions, grouped by status category, so clients pass exact status names to `transition_issue`. If the fetch fails (for example the instance is unreachable), the instructions state that statuses could not be fetched and refer clients to `get_transitions`.
+
 ### Available Tools
 
 | Tool | Description |

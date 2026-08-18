@@ -535,6 +535,70 @@ class TestGetIssueQualityReport:
         client.search.assert_called_with("project = PROJ", limit=10)
 
 
+class TestBuildInstructions:
+    """The server instructions list the instance's ticket statuses."""
+
+    def test_instructions_include_statuses_by_category(self) -> None:
+        """Fetched statuses appear in the instructions grouped by category."""
+        from jira_cli.mcp import ISSUE_WRITING_GUIDANCE, build_instructions
+        from jira_cli.models import Status
+
+        statuses = [
+            Status(name="To Do", category="To Do"),
+            Status(name="In Review", category="In Progress"),
+            Status(name="Done", category="Done"),
+            Status(name="Done", category="Done"),
+        ]
+        with patch("jira_cli.mcp.load_config", return_value=mock_config()):
+            with patch("jira_cli.mcp.JiraClient") as mock_client_class:
+                client = create_mock_client()
+                client.get_statuses.return_value = statuses
+                mock_client_class.return_value = client
+
+                instructions = build_instructions()
+
+        assert ISSUE_WRITING_GUIDANCE in instructions
+        assert "transition_issue" in instructions
+        assert "In Progress: In Review" in instructions
+        assert "Done: Done" in instructions
+        assert "Done, Done" not in instructions
+
+    def test_instructions_report_unfetched_statuses(self) -> None:
+        """A fetch failure is reported as not checked, not as an error."""
+        import httpx
+
+        from jira_cli.mcp import ISSUE_WRITING_GUIDANCE, build_instructions
+
+        with patch("jira_cli.mcp.load_config", return_value=mock_config()):
+            with patch("jira_cli.mcp.JiraClient") as mock_client_class:
+                client = create_mock_client()
+                client.get_statuses.side_effect = httpx.ConnectError("down")
+                mock_client_class.return_value = client
+
+                instructions = build_instructions()
+
+        assert ISSUE_WRITING_GUIDANCE in instructions
+        assert "could not be fetched" in instructions
+        assert "get_transitions" in instructions
+
+    def test_main_applies_built_instructions(self) -> None:
+        """Startup sets the built instructions on the server before running."""
+        from jira_cli import mcp as mcp_module
+
+        original = mcp_module.mcp.instructions
+        try:
+            with patch.object(
+                mcp_module, "build_instructions", return_value="built text"
+            ):
+                with patch.object(mcp_module.mcp, "run") as mock_run:
+                    mcp_module.main()
+
+            assert mcp_module.mcp.instructions == "built text"
+            mock_run.assert_called_once()
+        finally:
+            mcp_module.mcp.instructions = original
+
+
 class TestIssueWritingGuidance:
     """The server tells LLM clients how Jira issue text must be written."""
 

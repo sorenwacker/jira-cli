@@ -6,6 +6,7 @@ from jira_cli.models import (
     Attachment,
     Comment,
     Issue,
+    Status,
     Transition,
     _extract_text_from_adf,
 )
@@ -134,6 +135,26 @@ class TestIssue:
         assert issue.components == []
         assert issue.fix_versions == []
         assert issue.due_date is None
+
+
+class TestStatus:
+    """Tests for Status model."""
+
+    def test_from_api_response(self) -> None:
+        """Status parses name and category."""
+        status = Status.from_api_response(
+            {"name": "In Review", "statusCategory": {"name": "In Progress"}}
+        )
+
+        assert status.name == "In Review"
+        assert status.category == "In Progress"
+
+    def test_from_api_response_no_category(self) -> None:
+        """Status handles missing statusCategory."""
+        status = Status.from_api_response({"name": "Odd"})
+
+        assert status.name == "Odd"
+        assert status.category == ""
 
 
 class TestComment:

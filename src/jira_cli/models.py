@@ -10,6 +10,7 @@ __all__ = [
     "Comment",
     "Issue",
     "Project",
+    "Status",
     "Transition",
     "User",
 ]
@@ -120,6 +121,21 @@ class Comment(BaseModel):
             author=data["author"]["displayName"],
             body=body,
             created=_parse_jira_datetime(data["created"]),
+        )
+
+
+class Status(BaseModel):
+    """Represents a ticket status defined in the Jira instance."""
+
+    name: str
+    category: str
+
+    @classmethod
+    def from_api_response(cls, data: dict[str, Any]) -> "Status":
+        """Create a Status from Jira API response."""
+        return cls(
+            name=data["name"],
+            category=data.get("statusCategory", {}).get("name", ""),
         )
 
 

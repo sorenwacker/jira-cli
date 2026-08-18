@@ -2,6 +2,7 @@
 
 from typing import Any
 
+import httpx
 from fastmcp import FastMCP
 
 from jira_cli.client import (
@@ -24,7 +25,34 @@ ISSUE_WRITING_GUIDANCE = (
     "Context, Goal, Scope, Acceptance criteria."
 )
 
+_STATUSES_UNAVAILABLE = (
+    "The instance's ticket statuses could not be fetched at startup; "
+    "use get_transitions to discover valid statuses for an issue."
+)
+
 mcp = FastMCP("Jira", instructions=ISSUE_WRITING_GUIDANCE)
+
+
+def build_instructions() -> str:
+    """Build server instructions including the instance's ticket statuses."""
+    try:
+        with get_client() as client:
+            statuses = client.get_statuses()
+    except (httpx.HTTPError, ValueError):
+        return f"{ISSUE_WRITING_GUIDANCE}\n\n{_STATUSES_UNAVAILABLE}"
+    by_category: dict[str, list[str]] = {}
+    for status in statuses:
+        names = by_category.setdefault(status.category, [])
+        if status.name not in names:
+            names.append(status.name)
+    lines = [
+        f"{category}: {', '.join(names)}" for category, names in by_category.items()
+    ]
+    return (
+        f"{ISSUE_WRITING_GUIDANCE}\n\n"
+        "Ticket statuses defined in this Jira instance, grouped by category; "
+        "pass the exact status name to transition_issue:\n" + "\n".join(lines)
+    )
 
 
 def _issue_to_dict(issue: Issue, *, full: bool = False) -> dict[str, Any]:
@@ -426,6 +454,7 @@ register_confluence_tools(mcp)
 
 def main() -> None:
     """Entry point for MCP server."""
+    mcp.instructions = build_instructions()
     mcp.run()
 
 
