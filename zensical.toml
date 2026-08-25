@@ -1,0 +1,26 @@
+[project]
+site_name = "jira-cli"
+site_description = "CLI, interactive shell and MCP server for Jira Cloud and Confluence Cloud"
+site_author = "Soren Wacker"
+site_url = "https://sorenwacker.github.io/jira-cli/"
+repo_url = "https://github.com/sorenwacker/jira-cli"
+docs_dir = "docs"
+site_dir = "site"
+
+[project.theme]
+variant = "modern"
+features = ["content.code.copy", "navigation.sections"]
+
+[project.markdown_extensions.admonition]
+[project.markdown_extensions.attr_list]
+[project.markdown_extensions.def_list]
+[project.markdown_extensions.toc]
+permalink = true
+[project.markdown_extensions.pymdownx.details]
+[project.markdown_extensions.pymdownx.highlight]
+anchor_linenums = true
+[project.markdown_extensions.pymdownx.inlinehilite]
+[project.markdown_extensions.pymdownx.superfences]
+custom_fences = [
+  { name = "mermaid", class = "mermaid", format = "pymdownx.superfences.fence_code_format" },
+]
