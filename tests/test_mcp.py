@@ -353,6 +353,28 @@ class TestAddComment:
         client.add_comment.assert_called_with("PROJ-123", "New comment")
 
 
+class TestUpdateComment:
+    """Tests for update_comment tool."""
+
+    def test_update_comment(self) -> None:
+        """Replaces the body of an existing comment."""
+        from jira_cli.mcp import update_comment
+
+        with patch("jira_cli.mcp.load_config", return_value=mock_config()):
+            with patch("jira_cli.mcp.JiraClient") as mock_client_class:
+                client = create_mock_client()
+                mock_client_class.return_value = client
+
+                result = update_comment("PROJ-123", "10001", "Edited text")
+
+        assert result == {
+            "success": True,
+            "issue_key": "PROJ-123",
+            "comment_id": "10001",
+        }
+        client.update_comment.assert_called_with("PROJ-123", "10001", "Edited text")
+
+
 class TestGetProjects:
     """Tests for get_projects tool."""
 

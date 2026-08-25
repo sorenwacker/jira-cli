@@ -68,6 +68,7 @@ edit --summary "new"    Edit fields (--priority, --labels, --description)
 cat / show              Show issue details
 comments                Show comments
 comment "text"          Add a comment
+editcomment ID "text"   Replace a comment's text
 delcomment ID           Delete a comment
 status                  Show available transitions
 status "New Status"     Change status
@@ -250,6 +251,7 @@ At startup the server also fetches the ticket statuses and issue types defined i
 | `transition_issue` | Change issue status |
 | `get_comments` | Get comments for an issue |
 | `add_comment` | Add a comment to an issue |
+| `update_comment` | Replace the body of an existing comment |
 | `get_projects` | Get all visible projects |
 | `get_users` | Search for users |
 | `watch_issue` | Start watching an issue |

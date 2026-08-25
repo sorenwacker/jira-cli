@@ -204,6 +204,16 @@ class JiraShell(cmd.Cmd):  # pylint: disable=too-many-public-methods
         options = ["--type", "--description"]
         return [o for o in options if o.startswith(text)]
 
+    def _complete_comment_id(self, text: str) -> list[str]:
+        """Complete comment IDs of the current issue."""
+        if not self.current_issue:
+            return []
+        try:
+            comments = self.client.get_comments(self.current_issue)
+            return [c.id for c in comments if c.id.startswith(text)]
+        except Exception:  # noqa: BLE001 - completion should not crash
+            return []
+
     def complete_delcomment(
         self,
         text: str,
@@ -212,13 +222,17 @@ class JiraShell(cmd.Cmd):  # pylint: disable=too-many-public-methods
         endidx: int,  # noqa: ARG002
     ) -> list[str]:
         """Complete comment IDs for delcomment command."""
-        if not self.current_issue:
-            return []
-        try:
-            comments = self.client.get_comments(self.current_issue)
-            return [c.id for c in comments if c.id.startswith(text)]
-        except Exception:  # noqa: BLE001 - completion should not crash
-            return []
+        return self._complete_comment_id(text)
+
+    def complete_editcomment(
+        self,
+        text: str,
+        line: str,  # noqa: ARG002
+        begidx: int,  # noqa: ARG002
+        endidx: int,  # noqa: ARG002
+    ) -> list[str]:
+        """Complete comment IDs for editcomment command."""
+        return self._complete_comment_id(text)
 
     def _update_prompt(self) -> None:
         """Update the prompt based on current state."""
@@ -488,6 +502,22 @@ class JiraShell(cmd.Cmd):  # pylint: disable=too-many-public-methods
         except Exception as e:  # noqa: BLE001 - user-facing error
             console.print(f"[red]Error: {e}[/red]")
 
+    def do_editcomment(self, arg: str) -> None:
+        """Replace the text of a comment."""
+        if not self.current_issue:
+            console.print("[yellow]No issue selected.[/yellow]")
+            return
+        comment_id, _, rest = arg.strip().partition(" ")
+        text = _strip_quotes(rest.strip())
+        if not comment_id or not text:
+            console.print('[yellow]Usage: editcomment COMMENT_ID "new text"[/yellow]')
+            return
+        try:
+            self.client.update_comment(self.current_issue, comment_id, text)
+            console.print(f"[green]Comment {comment_id} updated[/green]")
+        except Exception as e:  # noqa: BLE001 - user-facing error
+            console.print(f"[red]Error: {e}[/red]")
+
     def do_delcomment(self, arg: str) -> None:
         """Delete a comment."""
         if not self.current_issue:
@@ -566,6 +596,7 @@ def _get_help_text() -> str:
   edit --summary "new"    Edit fields (--priority, --labels)
   comments                Show comments
   comment "text"          Add a comment
+  editcomment ID "text"   Replace a comment's text
   delcomment ID           Delete a comment
   status                  Show available transitions
   status "New Status"     Change status

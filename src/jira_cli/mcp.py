@@ -341,6 +341,23 @@ def add_comment(issue_key: str, body: str) -> dict[str, Any]:
 
 
 @mcp.tool()
+def update_comment(issue_key: str, comment_id: str, body: str) -> dict[str, Any]:
+    """Replace the body of an existing comment.
+
+    Args:
+        issue_key: The issue key (e.g., "PROJ-123").
+        comment_id: The comment ID as returned by get_comments.
+        body: The new comment text; replaces the previous body entirely.
+
+    Returns:
+        Success status.
+    """
+    with get_client() as client:
+        client.update_comment(issue_key, comment_id, body)
+        return {"success": True, "issue_key": issue_key, "comment_id": comment_id}
+
+
+@mcp.tool()
 def get_projects() -> list[dict[str, str]]:
     """Get all projects visible to the current user.
 

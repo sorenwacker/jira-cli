@@ -183,6 +183,31 @@ class TestShellCommands:
 
         mock_client.add_comment.assert_called_with("DAT-123", "test comment")
 
+    def test_editcomment_requires_issue(
+        self, shell: JiraShell, mock_client: MagicMock
+    ) -> None:
+        """Without a selected issue, editcomment does nothing."""
+        shell.do_editcomment('10001 "new text"')
+        mock_client.update_comment.assert_not_called()
+
+    def test_editcomment_requires_id_and_text(
+        self, shell: JiraShell, mock_client: MagicMock, mock_issues: list[Issue]
+    ) -> None:
+        """With only an ID, editcomment does not call the client."""
+        mock_client.get_issue.return_value = mock_issues[0]
+        shell.do_cd("DAT-123")
+        shell.do_editcomment("10001")
+        mock_client.update_comment.assert_not_called()
+
+    def test_editcomment_updates_comment(
+        self, shell: JiraShell, mock_client: MagicMock, mock_issues: list[Issue]
+    ) -> None:
+        """The editcomment command replaces the comment body."""
+        mock_client.get_issue.return_value = mock_issues[0]
+        shell.do_cd("DAT-123")
+        shell.do_editcomment('10001 "new text"')
+        mock_client.update_comment.assert_called_with("DAT-123", "10001", "new text")
+
     def test_status_shows_transitions(
         self, shell: JiraShell, mock_client: MagicMock, mock_issues: list[Issue]
     ) -> None:
