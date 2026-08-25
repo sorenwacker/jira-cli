@@ -375,6 +375,28 @@ class TestUpdateComment:
         client.update_comment.assert_called_with("PROJ-123", "10001", "Edited text")
 
 
+class TestDeleteComment:
+    """Tests for delete_comment tool."""
+
+    def test_delete_comment(self) -> None:
+        """Deletes a comment by ID."""
+        from jira_cli.mcp import delete_comment
+
+        with patch("jira_cli.mcp.load_config", return_value=mock_config()):
+            with patch("jira_cli.mcp.JiraClient") as mock_client_class:
+                client = create_mock_client()
+                mock_client_class.return_value = client
+
+                result = delete_comment("PROJ-123", "10001")
+
+        assert result == {
+            "success": True,
+            "issue_key": "PROJ-123",
+            "comment_id": "10001",
+        }
+        client.delete_comment.assert_called_with("PROJ-123", "10001")
+
+
 class TestGetProjects:
     """Tests for get_projects tool."""
 

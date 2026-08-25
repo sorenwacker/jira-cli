@@ -294,6 +294,14 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 | `get_comments` | Get issue comments |
 | `add_comment` | Add a comment |
 | `update_comment` | Replace the body of an existing comment |
+| `delete_comment` | Delete a comment |
+| `delete_issue` | Delete an issue |
+| `get_issue_quality_report` | Score issues on completeness (see README) |
+| `confluence_search`, `get_page`, `list_spaces`, `create_page`, `update_page` | Confluence tools, see CONFLUENCE.md |
+
+### Surface Parity
+
+Every capability is exposed on both the CLI (`jira`, `confluence`) and the MCP server. The mapping between MCP tool names and CLI command paths is declared in `tests/test_surface_parity.py`, which fails when an MCP tool has no CLI command or a CLI command has no MCP tool. The only CLI commands outside the mapping are `config` and `shell`, which have no MCP equivalent by design. Adding a capability means adding it to the client, both surfaces, and the mapping in the same change.
 | `get_projects` | List all projects |
 | `get_users` | Search users |
 | `watch_issue` | Start watching an issue |

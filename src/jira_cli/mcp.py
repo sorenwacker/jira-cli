@@ -14,7 +14,7 @@ from jira_cli.client import (
 from jira_cli.config import load_config, load_writing_guidance
 from jira_cli.confluence_mcp import register as register_confluence_tools
 from jira_cli.models import Issue, IssueType, Status
-from jira_cli.quality import generate_quality_report
+from jira_cli.quality import build_quality_jql, generate_quality_report
 
 __all__ = ["main", "mcp"]
 
@@ -358,6 +358,22 @@ def update_comment(issue_key: str, comment_id: str, body: str) -> dict[str, Any]
 
 
 @mcp.tool()
+def delete_comment(issue_key: str, comment_id: str) -> dict[str, Any]:
+    """Delete a comment from an issue.
+
+    Args:
+        issue_key: The issue key (e.g., "PROJ-123").
+        comment_id: The comment ID as returned by get_comments.
+
+    Returns:
+        Success status.
+    """
+    with get_client() as client:
+        client.delete_comment(issue_key, comment_id)
+        return {"success": True, "issue_key": issue_key, "comment_id": comment_id}
+
+
+@mcp.tool()
 def get_projects() -> list[dict[str, str]]:
     """Get all projects visible to the current user.
 
@@ -474,17 +490,7 @@ def get_issue_quality_report(
         List of issues with quality ratings.
     """
     with get_client() as client:
-        if jql:
-            issues = client.search(jql, limit=limit)
-        else:
-            jql_parts = []
-            if project:
-                jql_parts.append(f"project = {project}")
-            if status:
-                jql_parts.append(f'status = "{status}"')
-            query = " AND ".join(jql_parts) if jql_parts else "ORDER BY created DESC"
-            issues = client.search(query, limit=limit)
-
+        issues = client.search(build_quality_jql(project, status, jql), limit=limit)
         return generate_quality_report(issues)
 
 

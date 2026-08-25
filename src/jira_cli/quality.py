@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from jira_cli.models import Issue
 
 __all__ = [
+    "build_quality_jql",
     "calculate_quality_score",
     "format_age",
     "generate_quality_report",
@@ -152,3 +153,24 @@ def generate_quality_report(issues: list[Issue]) -> list[dict[str, str | int | N
         }
         for issue in issues
     ]
+
+
+def build_quality_jql(project: str | None, status: str | None, jql: str | None) -> str:
+    """Resolve the query used to select issues for a quality report.
+
+    Args:
+        project: Project key filter.
+        status: Status name filter.
+        jql: Explicit query; when given, project and status are ignored.
+
+    Returns:
+        The JQL string to search with.
+    """
+    if jql:
+        return jql
+    parts = []
+    if project:
+        parts.append(f"project = {project}")
+    if status:
+        parts.append(f'status = "{status}"')
+    return " AND ".join(parts) if parts else "ORDER BY created DESC"

@@ -460,3 +460,43 @@ class TestConfigCommand:
         assert saved_config.url == "https://new.atlassian.net"
         assert saved_config.email == "new@example.com"
         assert saved_config.api_token == "new-token"
+
+
+class TestIssueQuality:
+    """Tests for the issue quality command."""
+
+    def test_quality_builds_jql_from_filters(self) -> None:
+        """Project and status filters become a JQL query."""
+        with patch("jira_cli.cli.load_config", return_value=mock_config()):
+            with patch("jira_cli.cli.JiraClient") as mock_client_class:
+                client = create_mock_client()
+                client.search.return_value = mock_issues()
+                mock_client_class.return_value = client
+
+                result = runner.invoke(
+                    app,
+                    ["issue", "quality", "--project", "PROJ", "--status", "To Do"],
+                )
+
+        assert result.exit_code == 0
+        client.search.assert_called_with(
+            'project = PROJ AND status = "To Do"', limit=50
+        )
+        assert "PROJ-123" in result.output
+        assert "/10" in result.output
+
+    def test_quality_custom_jql_wins(self) -> None:
+        """An explicit JQL query is used as given."""
+        with patch("jira_cli.cli.load_config", return_value=mock_config()):
+            with patch("jira_cli.cli.JiraClient") as mock_client_class:
+                client = create_mock_client()
+                client.search.return_value = []
+                mock_client_class.return_value = client
+
+                result = runner.invoke(
+                    app, ["issue", "quality", "--jql", "project = X", "--limit", "5"]
+                )
+
+        assert result.exit_code == 0
+        client.search.assert_called_with("project = X", limit=5)
+        assert "No issues found" in result.output

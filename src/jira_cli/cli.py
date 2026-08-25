@@ -15,6 +15,7 @@ from jira_cli.client import (
 )
 from jira_cli.config import JiraConfig, load_config, save_config
 from jira_cli.display import build_comment_panel, build_issue_content, truncate
+from jira_cli.quality import build_quality_jql, generate_quality_report
 from jira_cli.shell import JiraShell
 
 __all__ = ["app"]
@@ -362,6 +363,38 @@ def issue_delete(
         client.delete_issue(issue_key)
 
     console.print(f"[green]Deleted {issue_key}[/green]")
+
+
+@issue_app.command("quality")
+def issue_quality(
+    project: str | None = typer.Option(None, "--project", "-p", help="Project key"),
+    status: str | None = typer.Option(None, "--status", "-s", help="Filter by status"),
+    jql: str | None = typer.Option(
+        None, "--jql", help="Custom JQL (overrides filters)"
+    ),
+    limit: int = typer.Option(50, "--limit", "-l", help="Max issues to analyze"),
+) -> None:
+    """Score issues on completeness (1-10)."""
+    with get_client() as client:
+        issues = client.search(build_quality_jql(project, status, jql), limit=limit)
+
+    if not issues:
+        console.print("[yellow]No issues found[/yellow]")
+        return
+
+    table = Table(title="Issue Quality")
+    for column in ("Key", "Summary", "Creator", "Age", "Status", "Rating"):
+        table.add_column(column)
+    for row in generate_quality_report(issues):
+        table.add_row(
+            str(row["key"]),
+            truncate(str(row["summary"]), 50),
+            str(row["creator"] or ""),
+            str(row["age"]),
+            str(row["status"]),
+            f"{row['rating']}/10",
+        )
+    console.print(table)
 
 
 @app.command()
