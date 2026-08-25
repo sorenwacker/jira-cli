@@ -177,4 +177,5 @@ min_confidence = 80
 [dependency-groups]
 dev = [
     "pip-audit>=2.10.0",
+    "zensical>=0.0.57,<1",
 ]
