@@ -301,3 +301,7 @@ Generate an issue quality report for project DAT
 uv pip install -e ".[dev]"
 pytest
 ```
+
+## License
+
+Apache License 2.0. See [LICENSE](LICENSE).
