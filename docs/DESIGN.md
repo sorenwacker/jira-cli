@@ -78,6 +78,8 @@ Shell commands:
 | `cat` / `show` | Show current issue details |
 | `comments` | Show comments |
 | `comment "text"` | Add a comment |
+| `editcomment ID "text"` | Replace a comment's text |
+| `delcomment ID` | Delete a comment |
 | `status` | Show available transitions |
 | `status "New"` | Change status |
 | `h` / `help` | Show help |
@@ -207,6 +209,7 @@ def hello():
 | Get issue | GET | `/rest/api/3/issue/{key}` |
 | Get comments | GET | `/rest/api/3/issue/{key}/comment` |
 | Add comment | POST | `/rest/api/3/issue/{key}/comment` |
+| Update comment | PUT | `/rest/api/3/issue/{key}/comment/{id}` |
 | Get transitions | GET | `/rest/api/3/issue/{key}/transitions` |
 | Do transition | POST | `/rest/api/3/issue/{key}/transitions` |
 | List statuses | GET | `/rest/api/3/status` |
@@ -290,6 +293,7 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 | `transition_issue` | Change issue status |
 | `get_comments` | Get issue comments |
 | `add_comment` | Add a comment |
+| `update_comment` | Replace the body of an existing comment |
 | `get_projects` | List all projects |
 | `get_users` | Search users |
 | `watch_issue` | Start watching an issue |
