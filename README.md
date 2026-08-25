@@ -158,6 +158,13 @@ jira issue watch PROJ-123
 jira issue unwatch PROJ-123
 ```
 
+Quality report (scoring described under MCP Server below):
+
+```bash
+jira issue quality --project PROJ
+jira issue quality --jql "project = PROJ AND status = Done" --limit 20
+```
+
 ## Confluence
 
 The `confluence` command manages Confluence Cloud pages using the same
@@ -252,6 +259,7 @@ At startup the server also fetches the ticket statuses and issue types defined i
 | `get_comments` | Get comments for an issue |
 | `add_comment` | Add a comment to an issue |
 | `update_comment` | Replace the body of an existing comment |
+| `delete_comment` | Delete a comment |
 | `get_projects` | Get all visible projects |
 | `get_users` | Search for users |
 | `watch_issue` | Start watching an issue |
@@ -266,7 +274,7 @@ At startup the server also fetches the ticket statuses and issue types defined i
 
 ### Issue Quality Report
 
-The `get_issue_quality_report` tool analyzes issues and scores them on a 1-10 scale:
+The `get_issue_quality_report` tool and the `jira issue quality` command analyze issues and scores them on a 1-10 scale:
 
 | Criterion | Points | Condition |
 |-----------|--------|-----------|
