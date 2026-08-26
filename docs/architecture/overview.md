@@ -54,11 +54,11 @@ Every capability is exposed on both the CLI (`jira`, `confluence`) and the MCP s
 
 ```python
 class Issue:
-    key: str                      # "PROJ-123"
+    key: str  # "PROJ-123"
     summary: str
     status: str
-    assignee: str | None          # display name
-    reporter: str | None          # display name
+    assignee: str | None  # display name
+    reporter: str | None  # display name
     project: str
     priority: str | None
     created: datetime
@@ -67,8 +67,9 @@ class Issue:
     description: str | None
     attachments: list[Attachment]
     labels: list[str]
-    components: list[str]         # component names
-    fix_versions: list[str]       # version names
+    components: list[str]  # component names
+    fix_versions: list[str]  # version names
+
 
 class Comment:
     id: str
@@ -76,28 +77,31 @@ class Comment:
     body: str
     created: datetime
 
+
 class User:
     account_id: str
     display_name: str
-    email: str | None             # may be None for privacy
+    email: str | None  # may be None for privacy
     active: bool
     avatar_url: str | None
 
+
 class Space:
-    id: str                       # numeric
-    key: str                      # "DEV"
+    id: str  # numeric
+    key: str  # "DEV"
     name: str
-    type: str                     # "global", "personal"
+    type: str  # "global", "personal"
     status: str
 
+
 class Page:
-    id: str                       # numeric
+    id: str  # numeric
     title: str
-    space_id: str | None          # absent in search results
+    space_id: str | None  # absent in search results
     status: str
-    version: int | None           # absent in search results
-    body: str | None              # storage XHTML, only when fetched in full
-    url: str | None               # server-relative web UI path
+    version: int | None  # absent in search results
+    body: str | None  # storage XHTML, only when fetched in full
+    url: str | None  # server-relative web UI path
 ```
 
 ### Issue field writes
@@ -106,7 +110,9 @@ class Page:
 
 ```python
 client.create_issue(
-    IssueCreateParams(project="PROJ", summary="Subtask", issue_type="Sub-task", parent="PROJ-123")
+    IssueCreateParams(
+        project="PROJ", summary="Subtask", issue_type="Sub-task", parent="PROJ-123"
+    )
 )
 ```
 
