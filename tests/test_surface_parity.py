@@ -2,7 +2,6 @@
 
 import asyncio
 
-import click
 import typer
 
 from jira_cli import cli, confluence_cli, mcp
@@ -38,12 +37,18 @@ CLI_ALIASES = {("jira", "issue", "create-subtask"): "create_issue"}
 
 
 def _leaf_commands(name: str, app: typer.Typer) -> set[tuple[str, ...]]:
-    """Return every runnable command path of a Typer app."""
+    """Return every runnable command path of a Typer app.
+
+    Groups are detected by their `commands` mapping rather than by an
+    isinstance check: Typer vendors its own copy of click, so its groups are
+    not instances of the installed `click.Group`.
+    """
     paths: set[tuple[str, ...]] = set()
 
-    def walk(cmd: click.Command, prefix: tuple[str, ...]) -> None:
-        if isinstance(cmd, click.Group):
-            for sub_name, sub in cmd.commands.items():
+    def walk(cmd: object, prefix: tuple[str, ...]) -> None:
+        subcommands = getattr(cmd, "commands", None)
+        if subcommands:
+            for sub_name, sub in subcommands.items():
                 walk(sub, (*prefix, sub_name))
         else:
             paths.add(prefix)
