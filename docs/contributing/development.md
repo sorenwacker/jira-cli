@@ -36,7 +36,7 @@ Dependabot keeps dependencies current. It is native to GitHub, so there is no th
 | Security fix for an open alert | Raised as soon as the advisory lands, merged automatically once CI passes |
 | Major | Opened on its own for manual review |
 
-`.github/workflows/dependabot-automerge.yml` performs the merge. It runs only for pull requests opened by `dependabot[bot]`, skips major updates, waits for the CI run to finish with `gh pr checks --watch --fail-fast`, and only then squashes. Waiting on the checks rather than enabling GitHub auto-merge is deliberate: `main` carries no required status checks, so auto-merge would land the PR without waiting for anything.
+`.github/workflows/dependabot-automerge.yml` performs the merge. It runs only for pull requests opened by `dependabot[bot]`, skips major updates, polls the pull request's checks until they finish, and only then squashes. Two details are deliberate. It polls rather than using `gh pr checks --watch`, because the automerge job is itself one of the pull request's checks and watching all of them would wait on itself forever; the poll therefore excludes its own check by name. And it waits on checks rather than enabling GitHub auto-merge, because `main` carries no required status checks, so auto-merge would land the pull request without waiting for anything.
 
 Every declared dependency carries an upper bound below the next major (`>=13.0.0,<16`). CI installs with a fresh resolution rather than the lock file, so an unbounded requirement would let a future major break installs while lock-based runs stayed green. Add a bound when adding a dependency; `tests/test_dependency_bounds.py` fails otherwise.
 

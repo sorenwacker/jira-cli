@@ -23,5 +23,21 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_URL: ${{ github.event.pull_request.html_url }}
         run: |
-          gh pr checks "$PR_URL" --watch --fail-fast --interval 15
-          gh pr merge "$PR_URL" --squash --delete-branch
+          # Wait on every check except this job's own, which would deadlock.
+          for _ in $(seq 1 40); do
+            failed=$(gh pr checks "$PR_URL" --json name,bucket \
+              -q '[.[] | select(.name != "automerge") | select(.bucket == "fail" or .bucket == "cancel")] | length')
+            if [ "$failed" != "0" ]; then
+              echo "CI failed; leaving the pull request open."
+              exit 1
+            fi
+            pending=$(gh pr checks "$PR_URL" --json name,bucket \
+              -q '[.[] | select(.name != "automerge") | select(.bucket == "pending")] | length')
+            if [ "$pending" = "0" ]; then
+              gh pr merge "$PR_URL" --squash --delete-branch
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "Timed out waiting for CI; leaving the pull request open."
+          exit 1
