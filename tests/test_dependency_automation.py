@@ -31,11 +31,22 @@ def test_every_update_entry_has_a_schedule() -> None:
         assert update["schedule"]["interval"]
 
 
+def _merge_step() -> dict:
+    workflow: dict = yaml.safe_load(AUTOMERGE.read_text())
+    job: dict = workflow["jobs"]["automerge"]
+    assert job["if"] == "github.actor == 'dependabot[bot]'"
+    step: dict = job["steps"][-1]
+    return step
+
+
 def test_automerge_is_restricted_to_dependabot_and_skips_majors() -> None:
     """The workflow must not merge human PRs or unreviewed major bumps."""
-    workflow: dict = yaml.safe_load(AUTOMERGE.read_text())
-    job = workflow["jobs"]["automerge"]
-    assert job["if"] == "github.actor == 'dependabot[bot]'"
-    merge_step = job["steps"][-1]
-    assert "version-update:semver-major" in merge_step["if"]
-    assert "--watch" in merge_step["run"]
+    assert "version-update:semver-major" in _merge_step()["if"]
+
+
+def test_automerge_waits_for_ci_without_waiting_on_itself() -> None:
+    """Watching every check deadlocks: this job is itself one of the checks."""
+    run = _merge_step()["run"]
+    assert "gh pr checks" in run
+    assert 'select(.name != "automerge")' in run
+    assert "--watch" not in run
