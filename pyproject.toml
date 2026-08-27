@@ -179,4 +179,6 @@ dev = [
     "pip-audit>=2.10.0,<3",
     "zensical>=0.0.57,<1",
     "packaging>=25,<27",
+    "pyyaml>=6,<7",
+    "types-PyYAML>=6,<7",
 ]
