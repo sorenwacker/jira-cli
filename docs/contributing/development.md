@@ -48,6 +48,10 @@ uv run --with pip-audit pip-audit
 
 Refresh every locked version at once with `uv lock --upgrade`, then run the gates before committing.
 
+## Code scanning
+
+CodeQL analyses the Python sources on every push to `main`, on every pull request, and weekly, using the `security-and-quality` query suite. Findings appear under the repository's Security tab rather than as a failing check, so a new alert does not block a merge. `.github/workflows/codeql.yml` holds the configuration.
+
 ## Workflow
 
 Documentation is updated first, then tests, then the implementation. A branch gets a pull request when pushed. Releases are tag-driven and cut by the repository owner; the documentation site deploys from `main` through GitHub Pages.
