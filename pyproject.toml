@@ -11,7 +11,7 @@ dependencies = [
     "httpx>=0.27.0,<1",
     "pydantic>=2.13.5,<3",
     "rich>=13.0.0,<16",
-    "fastmcp>=3.3,<4",
+    "fastmcp>=4.0.2,<5",
 ]
 
 [project.optional-dependencies]
