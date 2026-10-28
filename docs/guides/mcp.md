@@ -41,7 +41,7 @@ Configure `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
 ## Writing conventions
 
-The server instructs LLM clients how to write content through its server instructions; the descriptions of `create_issue`, `update_issue`, `create_page`, and `update_page` refer clients to them. The default convention: Jira issue descriptions and Confluence pages must be plain English prose without markdown tables (Jira does not render them, and the Confluence converter leaves them as literal text), and issue descriptions must be structured into the sections Context, Goal, Scope, Acceptance criteria.
+The server instructs LLM clients how to write content through its server instructions; the descriptions of `create_issue`, `update_issue`, `create_page`, and `update_page` refer clients to them. The default convention: Jira issue descriptions and Confluence pages must be plain English prose without markdown tables (Jira does not render them, and the Confluence converter leaves them as literal text), and issue descriptions must be structured into the sections Context, Goal, Scope, Acceptance criteria, with each acceptance criterion written as one Given/When/Then sentence.
 
 To use your own convention, create `~/.config/jira-cli/guidance.md`; its content replaces the default guidance. Delete the file to return to the default. An empty file is treated as absent.
 

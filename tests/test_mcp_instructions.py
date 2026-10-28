@@ -131,6 +131,7 @@ class TestIssueWritingGuidance:
         "Goal",
         "Scope",
         "Acceptance criteria",
+        "Given/When/Then",
     )
 
     def test_server_instructions_state_writing_convention(self) -> None:
