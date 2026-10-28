@@ -23,7 +23,8 @@ DEFAULT_WRITING_GUIDANCE = (
     "English prose. Do not use markdown tables; Jira does not render them and "
     "the Confluence converter leaves them as literal text. "
     "Structure every issue description with these sections: "
-    "Context, Goal, Scope, Acceptance criteria."
+    "Context, Goal, Scope, Acceptance criteria. "
+    "Write each acceptance criterion as one Given/When/Then sentence."
 )
 
 _INSTANCE_METADATA_UNAVAILABLE = (
