@@ -365,6 +365,21 @@ class TestIssueMetadataOptions:
         assert params.fix_versions == ["1.2.0"]
         assert params.due_date == "2024-02-01"
 
+    def test_edit_with_parent(self) -> None:
+        """Edit passes the new parent key."""
+        with patch("jira_cli.cli.load_config", return_value=mock_config()):
+            with patch("jira_cli.cli.JiraClient") as mock_client_class:
+                client = create_mock_client()
+                client.update_issue.return_value = True
+                mock_client_class.return_value = client
+
+                result = runner.invoke(
+                    app, ["issue", "edit", "PROJ-123", "--parent", "PROJ-100"]
+                )
+
+        assert result.exit_code == 0
+        assert client.update_issue.call_args[0][1].parent == "PROJ-100"
+
 
 class TestMoveCommand:
     """Tests for 'jira issue move' command."""
