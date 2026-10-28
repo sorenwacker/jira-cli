@@ -45,9 +45,10 @@ Edit an issue:
 ```bash
 jira issue edit PROJ-123 --summary "New title" --priority High
 jira issue edit PROJ-123 --reporter 5b10ac8d... --components "API,UI" --fix-versions "1.2.0" --due-date 2026-09-01
+jira issue edit PROJ-123 --parent PROJ-100
 ```
 
-`--reporter` and `--assignee` take Jira account IDs (find them with `jira user list`). `--components` and `--fix-versions` take comma-separated names that must already exist in the project; setting them replaces the current value. `--due-date` takes a `YYYY-MM-DD` date. Setting the reporter requires the "Modify Reporter" project permission. Descriptions accept [markdown](../reference/markdown.md).
+`--reporter` and `--assignee` take Jira account IDs (find them with `jira user list`). `--components` and `--fix-versions` take comma-separated names that must already exist in the project; setting them replaces the current value. `--due-date` takes a `YYYY-MM-DD` date. `--parent` takes an issue key and moves the issue under that parent, for example a task under an epic. Setting the reporter requires the "Modify Reporter" project permission. Descriptions accept [markdown](../reference/markdown.md).
 
 Change status:
 

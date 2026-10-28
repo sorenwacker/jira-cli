@@ -275,6 +275,19 @@ class TestUpdateIssue:
         assert params.fix_versions == ["1.2.0"]
         assert params.due_date == "2024-02-01"
 
+    def test_update_issue_parent(self) -> None:
+        """The parent key reaches the client."""
+        from jira_cli.mcp import update_issue
+
+        with patch("jira_cli.mcp.load_config", return_value=mock_config()):
+            with patch("jira_cli.mcp.JiraClient") as mock_client_class:
+                client = create_mock_client()
+                mock_client_class.return_value = client
+
+                update_issue("PROJ-123", parent="PROJ-100")
+
+        assert client.update_issue.call_args[0][1].parent == "PROJ-100"
+
 
 class TestGetTransitions:
     """Tests for get_transitions tool."""

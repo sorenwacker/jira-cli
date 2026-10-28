@@ -229,6 +229,7 @@ def update_issue(
     components: list[str] | None = None,
     fix_versions: list[str] | None = None,
     due_date: str | None = None,
+    parent: str | None = None,
 ) -> dict[str, Any]:
     """Update an issue's fields.
 
@@ -246,6 +247,7 @@ def update_issue(
         components: New component names; replaces the current list.
         fix_versions: New fix version names; replaces the current list.
         due_date: New due date in YYYY-MM-DD format.
+        parent: Key of the new parent issue, e.g. an epic.
 
     Returns:
         Success status.
@@ -260,6 +262,7 @@ def update_issue(
         components=components,
         fix_versions=fix_versions,
         due_date=due_date,
+        parent=parent,
     )
     with get_client() as client:
         updated = client.update_issue(issue_key, params)
