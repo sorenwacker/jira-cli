@@ -44,12 +44,17 @@ packages = ["src/jira_cli"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 addopts = ["-ra", "--showlocals", "--strict-markers", "--strict-config"]
 markers = [
     "slow: marks tests that take more than a few seconds (use -m 'not slow' to skip)",
 ]
 xfail_strict = true
-filterwarnings = ["error"]
+filterwarnings = [
+    "error",
+    # anyio 4.15.1 still imports CallSpec2, which pytest 9.2 deprecates; drop when anyio updates
+    "ignore:_pytest.python.CallSpec2 has been renamed:pytest.PytestRemovedIn10Warning",
+]
 
 [tool.ruff]
 target-version = "py312"
