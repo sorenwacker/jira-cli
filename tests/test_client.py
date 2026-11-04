@@ -393,6 +393,18 @@ class TestJiraClientUpdateIssue:
         assert body["fields"]["labels"] == ["bug", "urgent"]
 
     @respx.mock
+    def test_update_parent(self, jira_client: JiraClient) -> None:
+        """Update moves the issue under a new parent."""
+        route = respx.put("https://test.atlassian.net/rest/api/3/issue/PROJ-123").mock(
+            return_value=httpx.Response(204)
+        )
+
+        jira_client.update_issue("PROJ-123", IssueUpdateParams(parent="PROJ-100"))
+
+        body = json.loads(route.calls[0].request.content)
+        assert body["fields"]["parent"] == {"key": "PROJ-100"}
+
+    @respx.mock
     def test_update_metadata_fields(self, jira_client: JiraClient) -> None:
         """Update sends reporter, components, fix versions, and due date."""
         route = respx.put("https://test.atlassian.net/rest/api/3/issue/PROJ-123").mock(

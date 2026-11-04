@@ -322,6 +322,8 @@ class JiraClient:
             fields["labels"] = params.labels
         if params.assignee is not None:
             fields["assignee"] = {"id": params.assignee}
+        if params.parent is not None:
+            fields["parent"] = {"key": params.parent}
         fields.update(_build_metadata_fields(params))
         return fields
 
@@ -512,6 +514,7 @@ class IssueUpdateParams:  # pylint: disable=too-many-instance-attributes
     components: list[str] | None = None
     fix_versions: list[str] | None = None
     due_date: str | None = None
+    parent: str | None = None
 
 
 def _build_metadata_fields(

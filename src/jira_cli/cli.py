@@ -287,6 +287,7 @@ def issue_edit(
     components: str | None = typer.Option(None, "--components", help="CSV names"),
     fix_versions: str | None = typer.Option(None, "--fix-versions", help="CSV names"),
     due_date: str | None = typer.Option(None, "--due-date", help="YYYY-MM-DD"),
+    parent: str | None = typer.Option(None, "--parent", help="Parent issue key"),
 ) -> None:
     """Edit issue fields."""
     params = IssueUpdateParams(
@@ -299,6 +300,7 @@ def issue_edit(
         components=_parse_csv_list(components),
         fix_versions=_parse_csv_list(fix_versions),
         due_date=due_date,
+        parent=parent,
     )
     with get_client() as client:
         changed = client.update_issue(issue_key, params)
