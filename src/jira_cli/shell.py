@@ -409,7 +409,8 @@ class JiraShell(cmd.Cmd):  # pylint: disable=too-many-public-methods
             console.print('[yellow]Usage: new PROJECT "Summary"[/yellow]')
             return
         project, summary = args[0], args[1]
-        parsed = _parse_shell_args(" ".join(args[2:]))
+        # Re-quote (not just re-join) so multi-word option values survive.
+        parsed = _parse_shell_args(shlex.join(args[2:]))
         self._create_issue(project, summary, parsed)
 
     def _create_issue(
